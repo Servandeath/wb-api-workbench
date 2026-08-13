@@ -5,7 +5,7 @@
 Начать новый чат с фразы:
 
     Продолжаем проект WB API Workbench.
-    Локальный путь: E:\projects-wb-api-workbench
+    Локальный путь: E:\wb-api-workbench
     Прочитай NEXT_CHAT_CHECKPOINT.md — там актуальный статус.
 
 ## Что это за проект
@@ -17,14 +17,15 @@
 
 ## Стек
 
-Python 3.11+, customtkinter, SQLAlchemy + SQLite (слой готов, не подключён),
+Python 3.11+, customtkinter, SQLAlchemy + SQLite (подключено — init_db()
+вызывается при старте GUI, репозитории под ApiKey/ApiRequestLog),
 httpx, keyring, cryptography, pytest.
 
 ## Команды
 
 Запуск:
 
-    cd E:\projects-wb-api-workbench
+    cd E:\wb-api-workbench
     .\.venv\Scripts\Activate.ps1
     python -m app.main
 
