@@ -1,6 +1,7 @@
 ﻿import customtkinter as ctk
 
 from app.core.diagnostics import format_diagnostics, run_diagnostics
+from app.core.permissions import has_permission
 from app.core.settings import AppMode, UserRole, apply_settings
 from app.config import USERS_FILE
 from app.core.user_store import load_users, save_users
@@ -8,7 +9,6 @@ from app.db.database import init_db
 from app.core.users import (
     UserAccount,
     add_user,
-    can_manage_users,
     change_user_role,
     create_user,
     deactivate_user,
@@ -304,7 +304,7 @@ class MainWindow(ctk.CTk):
     def _show_users_section(self) -> None:
         current_role = UserRole(self.current_role)
 
-        if not can_manage_users(current_role):
+        if not has_permission(current_role, "manage_users"):
             self._show_default_section(
                 title="Users",
                 description="Access denied. Only Admin can manage user accounts.",
@@ -324,7 +324,7 @@ class MainWindow(ctk.CTk):
 
         description = ctk.CTkLabel(
             content,
-            text="Create and review manager accounts. Data is temporary for this app session.",
+            text="Create and review manager accounts. Changes are saved to disk and persist between restarts.",
             font=ctk.CTkFont(size=16),
             justify="left",
         )
