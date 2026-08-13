@@ -4,6 +4,7 @@ import json
 from app.core.wb_token import (
     decode_jwt,
     get_scopes,
+    get_scopes_with_ping_urls,
     has_scope,
     token_info,
 )
@@ -131,3 +132,14 @@ def test_token_info_for_defaults_to_none():
     info = token_info(token, now=0)
 
     assert info["for"] is None
+
+
+def test_get_scopes_with_ping_urls_includes_url():
+    bitmask = 1073741828  # Analytics (бит 2) + Read only (бит 30)
+
+    scopes = get_scopes_with_ping_urls(bitmask)
+
+    assert scopes == [
+        (2, "Analytics", "https://seller-analytics-api.wildberries.ru/ping"),
+        (30, "Read only", None),
+    ]

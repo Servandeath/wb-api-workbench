@@ -13,22 +13,24 @@ import json
 import time
 
 
-# Разделы API по битам поля "s". Бит -> человекочитаемое имя.
+# Разделы API по битам поля "s". Бит -> (человекочитаемое имя, ping URL).
+# URL берётся из боевого валидатора ключей (reference/api_key_stats.gs).
+# "Read only" — не раздел API, а флаг; ping URL для него нет.
 WB_SCOPES = {
-    1: "Content",
-    2: "Analytics",
-    3: "Prices and discounts",
-    4: "Marketplace",
-    5: "Statistics",
-    6: "Promotion",
-    7: "Feedbacks and Questions",
-    9: "Buyers chat",
-    10: "Supplies",
-    11: "Buyers returns",
-    12: "Documents",
-    13: "Finance",
-    16: "Users",
-    30: "Read only",
+    1: ("Content", "https://content-api.wildberries.ru/ping"),
+    2: ("Analytics", "https://seller-analytics-api.wildberries.ru/ping"),
+    3: ("Prices and discounts", "https://discounts-prices-api.wildberries.ru/ping"),
+    4: ("Marketplace", "https://marketplace-api.wildberries.ru/ping"),
+    5: ("Statistics", "https://statistics-api.wildberries.ru/ping"),
+    6: ("Promotion", "https://advert-api.wildberries.ru/ping"),
+    7: ("Feedbacks and Questions", "https://feedbacks-api.wildberries.ru/ping"),
+    9: ("Buyers chat", "https://buyer-chat-api.wildberries.ru/ping"),
+    10: ("Supplies", "https://supplies-api.wildberries.ru/ping"),
+    11: ("Buyers returns", "https://returns-api.wildberries.ru/ping"),
+    12: ("Documents", "https://documents-api.wildberries.ru/ping"),
+    13: ("Finance", "https://finance-api.wildberries.ru/ping"),
+    16: ("Users", "https://user-management-api.wildberries.ru/ping"),
+    30: ("Read only", None),
 }
 
 # Тип токена по полю "acc".
@@ -74,7 +76,22 @@ def get_scopes(bitmask: int) -> list[str]:
     """Список доступных разделов API по маске прав."""
     return [
         name
-        for bit, name in WB_SCOPES.items()
+        for bit, (name, _url) in WB_SCOPES.items()
+        if has_scope(bitmask, bit)
+    ]
+
+
+def get_scopes_with_ping_urls(bitmask: int) -> list[tuple[int, str, str | None]]:
+    """
+    Доступные разделы API по маске прав вместе с их ping URL.
+
+    Возвращает (bit, name, ping_url); ping_url — None для разделов без
+    отдельного эндпоинта (например Read only). Используется модулем
+    проверки живости ключей (wb_ping).
+    """
+    return [
+        (bit, name, url)
+        for bit, (name, url) in WB_SCOPES.items()
         if has_scope(bitmask, bit)
     ]
 
