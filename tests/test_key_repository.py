@@ -2,6 +2,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.core.marketplace import KeyKind, Marketplace
 from app.db.database import init_db
 from app.db.key_repository import (
     activate_api_key,
@@ -27,19 +28,53 @@ def session(tmp_path):
     db_session.close()
 
 
+def _add_wb_key(session, name="a", masked_token="x", storage_type="keyring"):
+    return add_api_key(
+        session,
+        name=name,
+        marketplace=Marketplace.WB,
+        key_kind=KeyKind.JWT,
+        masked_token=masked_token,
+        storage_type=storage_type,
+    )
+
+
 def test_add_api_key(session):
-    api_key = add_api_key(session, name="cab1", masked_token="abc...xyz", storage_type="encrypted_file")
+    api_key = add_api_key(
+        session,
+        name="cab1",
+        marketplace=Marketplace.WB,
+        key_kind=KeyKind.JWT,
+        masked_token="abc...xyz",
+        storage_type="encrypted_file",
+    )
 
     assert api_key.id is not None
     assert api_key.name == "cab1"
+    assert api_key.marketplace == "WB"
+    assert api_key.key_kind == "jwt"
     assert api_key.masked_token == "abc...xyz"
     assert api_key.storage_type == "encrypted_file"
     assert api_key.is_active is False
     assert api_key.last_used_at is None
 
 
+def test_add_api_key_stores_ozon_marketplace_and_kind(session):
+    api_key = add_api_key(
+        session,
+        name="ozon-seller-1",
+        marketplace=Marketplace.OZON,
+        key_kind=KeyKind.SELLER,
+        masked_token="cid...key",
+        storage_type="encrypted_file",
+    )
+
+    assert api_key.marketplace == "OZON"
+    assert api_key.key_kind == "seller"
+
+
 def test_get_api_key_by_name(session):
-    add_api_key(session, name="cab1", masked_token="abc", storage_type="keyring")
+    _add_wb_key(session, name="cab1", masked_token="abc")
 
     found = get_api_key_by_name(session, "cab1")
 
@@ -56,8 +91,8 @@ def test_list_api_keys_empty(session):
 
 
 def test_list_api_keys_returns_all(session):
-    add_api_key(session, name="a", masked_token="x", storage_type="keyring")
-    add_api_key(session, name="b", masked_token="y", storage_type="keyring")
+    _add_wb_key(session, name="a", masked_token="x")
+    _add_wb_key(session, name="b", masked_token="y")
 
     names = {key.name for key in list_api_keys(session)}
 
@@ -65,7 +100,7 @@ def test_list_api_keys_returns_all(session):
 
 
 def test_touch_api_key_last_used_sets_timestamp(session):
-    add_api_key(session, name="a", masked_token="x", storage_type="keyring")
+    _add_wb_key(session)
 
     updated = touch_api_key_last_used(session, "a")
 
@@ -77,7 +112,7 @@ def test_touch_api_key_last_used_missing_returns_none(session):
 
 
 def test_activate_api_key(session):
-    add_api_key(session, name="a", masked_token="x", storage_type="keyring")
+    _add_wb_key(session)
 
     updated = activate_api_key(session, "a")
 
@@ -85,7 +120,7 @@ def test_activate_api_key(session):
 
 
 def test_deactivate_api_key(session):
-    add_api_key(session, name="a", masked_token="x", storage_type="keyring")
+    _add_wb_key(session)
     activate_api_key(session, "a")
 
     updated = deactivate_api_key(session, "a")
@@ -94,7 +129,7 @@ def test_deactivate_api_key(session):
 
 
 def test_delete_api_key(session):
-    add_api_key(session, name="a", masked_token="x", storage_type="keyring")
+    _add_wb_key(session)
 
     assert delete_api_key(session, "a") is True
     assert get_api_key_by_name(session, "a") is None

@@ -9,11 +9,15 @@ from app.db.models import ApiKey
 def add_api_key(
     session: Session,
     name: str,
+    marketplace: str,
+    key_kind: str,
     masked_token: str,
     storage_type: str,
 ) -> ApiKey:
     api_key = ApiKey(
         name=name,
+        marketplace=marketplace,
+        key_kind=key_kind,
         masked_token=masked_token,
         storage_type=storage_type,
     )

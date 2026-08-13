@@ -11,6 +11,10 @@ class ApiKey(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    # Значения из app.core.marketplace.Marketplace / KeyKind. Обычные
+    # строки, не DB enum — новый маркетплейс не должен требовать миграции.
+    marketplace: Mapped[str] = mapped_column(String, nullable=False)
+    key_kind: Mapped[str] = mapped_column(String, nullable=False)
     masked_token: Mapped[str] = mapped_column(String, nullable=False)
     storage_type: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
