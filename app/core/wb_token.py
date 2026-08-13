@@ -96,13 +96,15 @@ def token_info(token: str, now: int | None = None) -> dict:
     days_left = (exp - now) // 86400 if exp else None
 
     return {
-        "cabinet_id": payload.get("oid"),      # внешний ID кабинета
+        # внешний ID кабинета; часть типов токенов кладёт его в sid, а не oid
+        "cabinet_id": payload.get("oid") or payload.get("sid"),
         "user_id": payload.get("uid"),         # внешний ID пользователя
         "token_id": payload.get("id"),         # внутренний UUID токена
         "acc_type": WB_TYPES.get(payload.get("acc"), str(payload.get("acc", ""))),
         "scopes": get_scopes(bitmask),
         "is_read_only": has_scope(bitmask, READ_ONLY_BIT),
         "is_test": bool(payload.get("t", False)),
+        "for": payload.get("for"),             # назначение токена, если указано
         "bitmask": bitmask,
         "expires_at": exp,
         "days_left": days_left,

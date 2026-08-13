@@ -1,9 +1,26 @@
+import base64
+import json
+
 from app.core.wb_token import (
     decode_jwt,
     get_scopes,
     has_scope,
     token_info,
 )
+
+
+def _make_token(payload: dict) -> str:
+    """
+    Собрать синтетический JWT без подписи для тестов edge-кейсов payload.
+    decode_jwt/token_info подпись не проверяют, так что произвольные
+    header/signature part'ы допустимы.
+    """
+    payload_b64 = (
+        base64.urlsafe_b64encode(json.dumps(payload).encode("utf-8"))
+        .rstrip(b"=")
+        .decode("ascii")
+    )
+    return f"header.{payload_b64}.signature"
 
 
 # Реальный WB-токен (read-only, кабинет 4102012) как золотой образец.
@@ -82,3 +99,35 @@ def test_token_info_expired_after_exp():
 
     assert info["is_active"] is False
     assert info["days_left"] < 0
+
+
+def test_token_info_prefers_oid_over_sid():
+    token = _make_token({"oid": 111, "sid": "some-uuid", "exp": 0, "s": 0})
+
+    info = token_info(token, now=0)
+
+    assert info["cabinet_id"] == 111
+
+
+def test_token_info_falls_back_to_sid_when_oid_missing():
+    token = _make_token({"sid": "some-uuid", "exp": 0, "s": 0})
+
+    info = token_info(token, now=0)
+
+    assert info["cabinet_id"] == "some-uuid"
+
+
+def test_token_info_reads_for_field():
+    token = _make_token({"for": "marketplace-api", "exp": 0, "s": 0})
+
+    info = token_info(token, now=0)
+
+    assert info["for"] == "marketplace-api"
+
+
+def test_token_info_for_defaults_to_none():
+    token = _make_token({"exp": 0, "s": 0})
+
+    info = token_info(token, now=0)
+
+    assert info["for"] is None
