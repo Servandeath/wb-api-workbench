@@ -342,7 +342,7 @@ class MainWindow(ctk.CTk):
             token_label = ctk.CTkLabel(self.keys_fields_frame, text="WB Token (JWT):")
             token_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
 
-            token_entry = ctk.CTkEntry(self.keys_fields_frame, width=380)
+            token_entry = ctk.CTkEntry(self.keys_fields_frame, width=380, show="*")
             token_entry.grid(row=0, column=1, padx=20, pady=10, sticky="w")
             self.keys_field_entries["token"] = token_entry
             return
@@ -400,7 +400,7 @@ class MainWindow(ctk.CTk):
 
         secret_label = ctk.CTkLabel(self.keys_ozon_entries_frame, text=secret_label_text)
         secret_label.grid(row=1, column=0, padx=20, pady=10, sticky="w")
-        secret_entry = ctk.CTkEntry(self.keys_ozon_entries_frame, width=240)
+        secret_entry = ctk.CTkEntry(self.keys_ozon_entries_frame, width=240, show="*")
         secret_entry.grid(row=1, column=1, padx=20, pady=10, sticky="w")
         self.keys_field_entries[secret_field] = secret_entry
 
@@ -447,6 +447,17 @@ class MainWindow(ctk.CTk):
         if self.keys_message_label is not None:
             self.keys_message_label.configure(text=text)
 
+    def _clear_keys_credential_entries(self) -> None:
+        """
+        Стереть введённый секрет из полей формы после успешного сохранения.
+
+        Поля и так маскируются (show="*") пока вводишь, но не очищались
+        после Save — секрет продолжал висеть в открытом виде в поле ввода
+        сколько угодно, пока не переключишь маркетплейс/тип ключа.
+        """
+        for entry in self.keys_field_entries.values():
+            entry.delete(0, "end")
+
     def _save_key_from_gui(self) -> None:
         if self.keys_name_entry is None or self.keys_marketplace_option is None:
             return
@@ -491,6 +502,7 @@ class MainWindow(ctk.CTk):
             session.close()
 
         self.keys_name_entry.delete(0, "end")
+        self._clear_keys_credential_entries()
         self._set_keys_message(f"Saved: {name} ({marketplace} / {key_kind})")
         self._refresh_keys_list()
 
