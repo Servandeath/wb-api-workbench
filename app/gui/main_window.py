@@ -4,6 +4,7 @@ from app.core.diagnostics import format_diagnostics, run_diagnostics
 from app.core.settings import AppMode, UserRole, apply_settings
 from app.config import USERS_FILE
 from app.core.user_store import load_users, save_users
+from app.db.database import init_db
 from app.core.users import (
     UserAccount,
     add_user,
@@ -45,6 +46,8 @@ class MainWindow(ctk.CTk):
 
         self.manage_username_entry: ctk.CTkEntry | None = None
         self.manage_role_option: ctk.CTkOptionMenu | None = None
+
+        init_db()
 
         self._build_layout()
         self._load_users_on_start()
