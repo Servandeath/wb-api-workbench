@@ -1,8 +1,7 @@
-from datetime import datetime
-
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.db.database import utcnow
 from app.db.models import ApiKey
 
 
@@ -43,7 +42,7 @@ def touch_api_key_last_used(session: Session, name: str) -> ApiKey | None:
     if api_key is None:
         return None
 
-    api_key.last_used_at = datetime.utcnow()
+    api_key.last_used_at = utcnow()
     session.commit()
     session.refresh(api_key)
 
