@@ -1,20 +1,13 @@
-﻿from enum import Enum
-
-
-class Role(str, Enum):
-    VIEWER = "viewer"
-    TESTER = "tester"
-    OPERATOR = "operator"
-    ADMIN = "admin"
+﻿from app.core.settings import UserRole
 
 
 PERMISSIONS = {
-    Role.VIEWER: {
+    UserRole.VIEWER: {
         "view_api_methods",
         "view_json_responses",
         "view_masked_keys",
     },
-    Role.TESTER: {
+    UserRole.TESTER: {
         "view_api_methods",
         "view_json_responses",
         "view_masked_keys",
@@ -22,7 +15,7 @@ PERMISSIONS = {
         "run_test_request",
         "save_test_response",
     },
-    Role.OPERATOR: {
+    UserRole.OPERATOR: {
         "view_api_methods",
         "view_json_responses",
         "view_masked_keys",
@@ -33,7 +26,7 @@ PERMISSIONS = {
         "import_files",
         "update_data",
     },
-    Role.ADMIN: {
+    UserRole.ADMIN: {
         "view_api_methods",
         "view_json_responses",
         "view_masked_keys",
@@ -53,5 +46,5 @@ PERMISSIONS = {
 }
 
 
-def has_permission(role: Role, permission: str) -> bool:
+def has_permission(role: UserRole, permission: str) -> bool:
     return permission in PERMISSIONS.get(role, set())

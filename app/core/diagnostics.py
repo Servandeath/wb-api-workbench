@@ -3,8 +3,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import BASE_DIR, DATA_DIR, RAW_DATA_DIR, IMPORTS_DIR, CACHE_DIR, SECURE_DIR
-from app.core.permissions import Role, has_permission
+from app.core.permissions import has_permission
 from app.core.session_key_storage import SessionKeyStorage
+from app.core.settings import UserRole
 
 
 @dataclass
@@ -59,10 +60,10 @@ def check_project_folders() -> DiagnosticResult:
 
 def check_permissions() -> DiagnosticResult:
     checks = [
-        has_permission(Role.ADMIN, "add_key") is True,
-        has_permission(Role.VIEWER, "add_key") is False,
-        has_permission(Role.OPERATOR, "run_real_request") is True,
-        has_permission(Role.TESTER, "run_test_request") is True,
+        has_permission(UserRole.ADMIN, "add_key") is True,
+        has_permission(UserRole.VIEWER, "add_key") is False,
+        has_permission(UserRole.OPERATOR, "run_real_request") is True,
+        has_permission(UserRole.TESTER, "run_test_request") is True,
     ]
 
     if all(checks):
