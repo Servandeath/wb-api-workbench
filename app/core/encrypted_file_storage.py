@@ -4,6 +4,7 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 
 from app.config import SECURE_DIR
+from app.core.token_utils import mask_token
 
 
 MASTER_KEY_PATH = SECURE_DIR / "master.key"
@@ -23,13 +24,6 @@ def load_or_create_master_key() -> bytes:
     key = Fernet.generate_key()
     MASTER_KEY_PATH.write_bytes(key)
     return key
-
-
-def mask_token(token: str) -> str:
-    if len(token) <= 12:
-        return "*" * len(token)
-
-    return f"{token[:8]}...{'*' * 12}...{token[-6:]}"
 
 
 class EncryptedFileKeyStorage:

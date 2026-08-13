@@ -2,6 +2,8 @@
 
 import keyring
 
+from app.core.token_utils import mask_token
+
 
 SERVICE_NAME = "wb-api-workbench"
 
@@ -11,13 +13,6 @@ class StoredKeyInfo:
     name: str
     masked_token: str
     storage_type: str = "windows_keyring"
-
-
-def mask_token(token: str) -> str:
-    if len(token) <= 12:
-        return "*" * len(token)
-
-    return f"{token[:8]}...{'*' * 12}...{token[-6:]}"
 
 
 class KeyStorage:
