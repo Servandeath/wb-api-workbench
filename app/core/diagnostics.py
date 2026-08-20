@@ -6,6 +6,8 @@ from app.config import BASE_DIR, DATA_DIR, RAW_DATA_DIR, IMPORTS_DIR, CACHE_DIR,
 from app.core.permissions import has_permission
 from app.core.session_key_storage import SessionKeyStorage
 from app.core.settings import UserRole
+from sqlalchemy import inspect
+from app.db.database import engine, init_db
 
 
 @dataclass
@@ -101,12 +103,40 @@ def check_session_key_storage() -> DiagnosticResult:
     )
 
 
+def check_database(bind_engine=engine) -> DiagnosticResult:
+    expected_tables = {"api_keys", "api_request_logs"}
+    try:
+        init_db(bind_engine=bind_engine)
+        existing = set(inspect(bind_engine).get_table_names())
+    except Exception as error:
+        return DiagnosticResult(
+            name="Database",
+            status="FAIL",
+            message=f"Cannot inspect database: {error}",
+        )
+
+    missing = expected_tables - existing
+    if not missing:
+        return DiagnosticResult(
+            name="Database",
+            status="OK",
+            message="Database ready, all tables exist",
+        )
+    return DiagnosticResult(
+        name="Database",
+        status="FAIL",
+        message="Missing tables: " + ", ".join(sorted(missing)),
+    )
+
 def run_diagnostics() -> list[DiagnosticResult]:
     return [
         check_python_version(),
         check_project_folders(),
         check_permissions(),
         check_session_key_storage(),
+        check_database(),
+        # TODO: check_libraries() — httpx, customtkinter, cryptography установлены
+        # TODO: check_encrypted_storage() — Fernet-хранилище пишет на диск
     ]
 
 
