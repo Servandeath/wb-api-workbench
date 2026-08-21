@@ -1,0 +1,219 @@
+import customtkinter as ctk
+
+from app.config import USERS_FILE
+from app.core.permissions import has_permission
+from app.core.settings import UserRole
+from app.core.user_store import save_users
+from app.core.users import add_user, change_user_role, deactivate_user, find_user
+
+
+class UsersSectionMixin:
+    def _show_users_section(self) -> None:
+        current_role = UserRole(self.current_role)
+
+        if not has_permission(current_role, "manage_users"):
+            self._show_default_section(
+                title="Users",
+                description="Access denied. Only Admin can manage user accounts.",
+            )
+            return
+
+        content = self._create_content_frame()
+        content.grid_rowconfigure(2, weight=0)
+        content.grid_rowconfigure(3, weight=1)
+
+        title = ctk.CTkLabel(
+            content,
+            text="Users",
+            font=ctk.CTkFont(size=28, weight="bold"),
+        )
+        title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
+
+        description = ctk.CTkLabel(
+            content,
+            text="Create and review manager accounts. Changes are saved to disk and persist between restarts.",
+            font=ctk.CTkFont(size=16),
+            justify="left",
+        )
+        description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
+
+        form = ctk.CTkFrame(content, corner_radius=12)
+        form.grid(row=2, column=0, padx=30, pady=20, sticky="nw")
+        form.grid_columnconfigure(1, weight=1)
+
+        username_label = ctk.CTkLabel(form, text="Username:")
+        username_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+
+        self.new_username_entry = ctk.CTkEntry(form, width=240)
+        self.new_username_entry.grid(row=0, column=1, padx=20, pady=15, sticky="w")
+
+        role_label = ctk.CTkLabel(form, text="Role:")
+        role_label.grid(row=1, column=0, padx=20, pady=15, sticky="w")
+
+        self.new_user_role_option = ctk.CTkOptionMenu(
+            form,
+            values=[role.value for role in UserRole],
+        )
+        self.new_user_role_option.set(UserRole.TESTER.value)
+        self.new_user_role_option.grid(row=1, column=1, padx=20, pady=15, sticky="w")
+
+        create_button = ctk.CTkButton(
+            form,
+            text="Create User",
+            height=40,
+            command=self._create_user_from_gui,
+        )
+        create_button.grid(
+            row=2,
+            column=0,
+            columnspan=2,
+            padx=20,
+            pady=20,
+            sticky="w",
+        )
+
+        self.users_message_label = ctk.CTkLabel(
+            form,
+            text="Only Admin can create users.",
+            font=ctk.CTkFont(size=13),
+        )
+        self.users_message_label.grid(
+            row=3,
+            column=0,
+            columnspan=2,
+            padx=20,
+            pady=(0, 20),
+            sticky="w",
+        )
+
+        manage_label = ctk.CTkLabel(
+            form,
+            text="Manage existing user:",
+            font=ctk.CTkFont(size=14, weight="bold"),
+        )
+        manage_label.grid(row=4, column=0, columnspan=2, padx=20, pady=(10, 5), sticky="w")
+
+        manage_username_label = ctk.CTkLabel(form, text="Target username:")
+        manage_username_label.grid(row=5, column=0, padx=20, pady=15, sticky="w")
+
+        self.manage_username_entry = ctk.CTkEntry(form, width=240)
+        self.manage_username_entry.grid(row=5, column=1, padx=20, pady=15, sticky="w")
+
+        manage_role_label = ctk.CTkLabel(form, text="New role:")
+        manage_role_label.grid(row=6, column=0, padx=20, pady=15, sticky="w")
+
+        self.manage_role_option = ctk.CTkOptionMenu(
+            form,
+            values=[role.value for role in UserRole],
+        )
+        self.manage_role_option.set(UserRole.TESTER.value)
+        self.manage_role_option.grid(row=6, column=1, padx=20, pady=15, sticky="w")
+
+        change_role_button = ctk.CTkButton(
+            form,
+            text="Change Role",
+            height=40,
+            command=self._change_role_from_gui,
+        )
+        change_role_button.grid(row=7, column=0, padx=20, pady=(10, 20), sticky="w")
+
+        deactivate_button = ctk.CTkButton(
+            form,
+            text="Deactivate",
+            height=40,
+            fg_color="#8B3A3A",
+            hover_color="#6E2E2E",
+            command=self._deactivate_user_from_gui,
+        )
+        deactivate_button.grid(row=7, column=1, padx=20, pady=(10, 20), sticky="w")
+        self.users_output = ctk.CTkTextbox(content, height=220)
+        self.users_output.grid(
+            row=3,
+            column=0,
+            padx=30,
+            pady=(0, 30),
+            sticky="nsew",
+        )
+
+        self._refresh_users_list()
+
+    def _create_user_from_gui(self) -> None:
+        if self.new_username_entry is None or self.new_user_role_option is None:
+            return
+
+        username = self.new_username_entry.get()
+        role = UserRole(self.new_user_role_option.get())
+
+        try:
+            user = add_user(self.user_accounts, username, role)
+        except ValueError as error:
+            if self.users_message_label is not None:
+                self.users_message_label.configure(text=str(error))
+            return
+
+        save_users(USERS_FILE, self.user_accounts)
+        self.new_username_entry.delete(0, "end")
+
+        if self.users_message_label is not None:
+            self.users_message_label.configure(
+                text=f"Created user: {user.username} / {user.role.value}"
+            )
+
+        self._refresh_users_list()
+
+    def _change_role_from_gui(self) -> None:
+        if self.manage_username_entry is None or self.manage_role_option is None:
+            return
+
+        username = self.manage_username_entry.get()
+        new_role = UserRole(self.manage_role_option.get())
+
+        user = find_user(self.user_accounts, username)
+        if user is None:
+            if self.users_message_label is not None:
+                self.users_message_label.configure(text=f"User not found: {username}")
+            return
+
+        change_user_role(user, new_role)
+        save_users(USERS_FILE, self.user_accounts)
+
+        if self.users_message_label is not None:
+            self.users_message_label.configure(
+                text=f"Role changed: {user.username} -> {new_role.value}"
+            )
+
+        self._refresh_users_list()
+
+    def _deactivate_user_from_gui(self) -> None:
+        if self.manage_username_entry is None:
+            return
+
+        username = self.manage_username_entry.get()
+
+        user = find_user(self.user_accounts, username)
+        if user is None:
+            if self.users_message_label is not None:
+                self.users_message_label.configure(text=f"User not found: {username}")
+            return
+
+        deactivate_user(user)
+        save_users(USERS_FILE, self.user_accounts)
+
+        if self.users_message_label is not None:
+            self.users_message_label.configure(text=f"User deactivated: {user.username}")
+
+        self._refresh_users_list()
+
+    def _refresh_users_list(self) -> None:
+        if self.users_output is None:
+            return
+
+        lines = []
+        for index, user in enumerate(self.user_accounts, start=1):
+            status = "active" if user.is_active else "inactive"
+            lines.append(f"{index}. {user.username} | {user.role.value} | {status}")
+
+        output = "\n".join(lines)
+
+        self.users_output.delete("1.0", "end")
+        self.users_output.insert("1.0", output)
