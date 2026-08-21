@@ -9,6 +9,7 @@ from app.core.ozon_ping import check_performance_key, check_seller_key
 from app.core.permissions import has_permission
 from app.core.settings import UserRole
 from app.core.wb_ping import ping_token
+from app.core.token_utils import mask_ozon_credentials
 from app.core.wb_token import token_info
 from app.db.database import SessionLocal
 from app.db.key_repository import (
@@ -318,12 +319,19 @@ class KeysSectionMixin:
                 self._set_keys_message(str(error))
                 return
 
+            # Ozon-secret — JSON, а не сырой токен: обычная маска на нём
+            # маскирует байты JSON, а не сами client_id/api_key. Отдельная
+            # маска поверх значений полей, для отображения в списке.
+            masked_token = stored["masked_token"]
+            if marketplace == Marketplace.OZON.value:
+                masked_token = mask_ozon_credentials(secret)
+
             add_api_key(
                 session,
                 name=name,
                 marketplace=marketplace,
                 key_kind=key_kind,
-                masked_token=stored["masked_token"],
+                masked_token=masked_token,
                 storage_type=stored["storage_type"],
             )
         finally:
