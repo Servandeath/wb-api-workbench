@@ -6,8 +6,9 @@ from app.gui.sections.diagnostics_section import DiagnosticsSectionMixin
 from app.gui.sections.settings_section import SettingsSectionMixin
 from app.gui.sections.users_section import UsersSectionMixin
 from app.gui.sections.keys_section import KeysSectionMixin
-from app.core.settings import AppMode, UserRole
-from app.config import USERS_FILE
+from app.core.settings import UserRole
+from app.config import SESSION_FILE, USERS_FILE
+from app.core.session_state import load_session_state
 from app.core.user_store import load_users, save_users
 from app.db.database import init_db
 from app.core.users import UserAccount, create_user
@@ -27,8 +28,12 @@ class MainWindow(
         ctk.set_default_color_theme("blue")
 
         self.current_section = "API Tester"
-        self.current_role = UserRole.VIEWER.value
-        self.current_mode = AppMode.TEST.value
+
+        # Роль и режим — с прошлого запуска (Settings -> Apply Settings их
+        # сохраняет), а не всегда Viewer/Test по умолчанию.
+        saved_role, saved_mode = load_session_state(SESSION_FILE)
+        self.current_role = saved_role.value
+        self.current_mode = saved_mode.value
 
         self.user_accounts: list[UserAccount] = []
 

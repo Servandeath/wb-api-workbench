@@ -41,6 +41,7 @@ Thumbs.db
 
 # User accounts (local runtime data)
 data/users.json
+data/session.json
 app/storage/users.json
 
 # Reference scripts (real-world logic, not part of this codebase)

@@ -1,5 +1,7 @@
 import customtkinter as ctk
 
+from app.config import SESSION_FILE
+from app.core.session_state import save_session_state
 from app.core.settings import AppMode, UserRole, apply_settings
 
 
@@ -92,6 +94,10 @@ class SettingsSectionMixin:
         self.current_role = role.value
         self.current_mode = mode.value
         self._update_status_label()
+
+        # Запоминаем выбор на диск — при следующем запуске не спрашиваем
+        # роль/режим заново (см. load_session_state в MainWindow.__init__).
+        save_session_state(SESSION_FILE, role, mode)
 
         if self.settings_message_label is not None:
             self.settings_message_label.configure(
