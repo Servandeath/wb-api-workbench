@@ -10,10 +10,6 @@ class UserAccount:
     is_active: bool = True
 
 
-def can_manage_users(role: UserRole) -> bool:
-    return role == UserRole.ADMIN
-
-
 def normalize_username(username: str) -> str:
     return username.strip()
 

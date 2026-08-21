@@ -5,28 +5,11 @@ from app.core.users import (
     UserAccount,
     add_user,
     find_user,
-    can_manage_users,
     change_user_role,
     create_user,
     deactivate_user,
     username_exists,
 )
-
-
-def test_admin_can_manage_users():
-    assert can_manage_users(UserRole.ADMIN) is True
-
-
-def test_operator_cannot_manage_users():
-    assert can_manage_users(UserRole.OPERATOR) is False
-
-
-def test_tester_cannot_manage_users():
-    assert can_manage_users(UserRole.TESTER) is False
-
-
-def test_viewer_cannot_manage_users():
-    assert can_manage_users(UserRole.VIEWER) is False
 
 
 def test_create_user_with_role():
