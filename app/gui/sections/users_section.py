@@ -19,25 +19,38 @@ class UsersSectionMixin:
             return
 
         content = self._create_content_frame()
-        content.grid_rowconfigure(2, weight=0)
-        content.grid_rowconfigure(3, weight=1)
+
+        # Быстрая добивка бэклога: form + список раньше клали прямо в content
+        # без скролла, и в небольшом окне низ (форма высокая сама по себе)
+        # выталкивал список за пределы окна без возможности прокрутки.
+        # Пробовали закрепить форму и скроллить только список — не сработало:
+        # если самой форме не хватает места, списку достаётся 0px и он вообще
+        # пропадает. Поэтому скроллим всю секцию одним контейнером — тогда
+        # ничего не может схлопнуться до нуля, в крайнем случае просто больше
+        # скроллить. В большом окне снизу будет немного пустого места — это
+        # ожидаемо для короткого списка, не баг.
+        content.grid_rowconfigure(0, weight=1)
+
+        scroll = ctk.CTkScrollableFrame(content, corner_radius=0, fg_color="transparent")
+        scroll.grid(row=0, column=0, sticky="nsew")
+        scroll.grid_columnconfigure(0, weight=1)
 
         title = ctk.CTkLabel(
-            content,
+            scroll,
             text="Users",
             font=ctk.CTkFont(size=28, weight="bold"),
         )
         title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
 
         description = ctk.CTkLabel(
-            content,
+            scroll,
             text="Create and review manager accounts. Changes are saved to disk and persist between restarts.",
             font=ctk.CTkFont(size=16),
             justify="left",
         )
         description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
 
-        form = ctk.CTkFrame(content, corner_radius=12)
+        form = ctk.CTkFrame(scroll, corner_radius=12)
         form.grid(row=2, column=0, padx=30, pady=20, sticky="nw")
         form.grid_columnconfigure(1, weight=1)
 
@@ -126,14 +139,18 @@ class UsersSectionMixin:
             command=self._deactivate_user_from_gui,
         )
         deactivate_button.grid(row=7, column=1, padx=20, pady=(10, 20), sticky="w")
-        self.users_output = ctk.CTkTextbox(content, height=220)
-        self.users_output.grid(
-            row=3,
-            column=0,
-            padx=30,
-            pady=(0, 30),
-            sticky="nsew",
+
+        # Список — обычный CTkLabel в том же скролле, что и форма выше
+        # (не отдельный CTkScrollableFrame и не CTkTextbox: один общий скролл
+        # на всю секцию, без вложенных/конкурирующих скроллов).
+        self.users_output = ctk.CTkLabel(
+            scroll,
+            text="",
+            justify="left",
+            anchor="nw",
+            font=ctk.CTkFont(family="Courier", size=13),
         )
+        self.users_output.grid(row=3, column=0, padx=30, pady=(0, 30), sticky="new")
 
         self._refresh_users_list()
 
@@ -213,7 +230,6 @@ class UsersSectionMixin:
             status = "active" if user.is_active else "inactive"
             lines.append(f"{index}. {user.username} | {user.role.value} | {status}")
 
-        output = "\n".join(lines)
+        output = "\n".join(lines) if lines else "No users yet."
 
-        self.users_output.delete("1.0", "end")
-        self.users_output.insert("1.0", output)
+        self.users_output.configure(text=output)
