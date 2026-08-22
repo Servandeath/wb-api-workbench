@@ -3,6 +3,7 @@ import json
 
 from app.core.wb_token import (
     decode_jwt,
+    get_scope_hosts,
     get_scopes,
     get_scopes_with_ping_urls,
     has_scope,
@@ -143,3 +144,27 @@ def test_get_scopes_with_ping_urls_includes_url():
         (2, "Analytics", "https://seller-analytics-api.wildberries.ru/ping"),
         (30, "Read only", None),
     ]
+
+
+def test_get_scope_hosts_strips_ping_suffix():
+    hosts = dict(get_scope_hosts())
+
+    assert hosts["Analytics"] == "https://seller-analytics-api.wildberries.ru"
+    assert hosts["Statistics"] == "https://statistics-api.wildberries.ru"
+
+
+def test_get_scope_hosts_excludes_read_only():
+    names = [name for name, _url in get_scope_hosts()]
+
+    assert "Read only" not in names
+
+
+def test_get_scope_hosts_returns_all_scopes_not_just_a_bitmask():
+    # В отличие от get_scopes_with_ping_urls, тут не про конкретный токен -
+    # это полный список разделов, независимо от прав.
+    names = [name for name, _url in get_scope_hosts()]
+
+    assert "Content" in names
+    assert "Finance" in names
+    assert "Users" in names
+    assert len(names) == 13

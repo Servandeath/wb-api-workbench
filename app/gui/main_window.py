@@ -6,16 +6,23 @@ from app.gui.sections.diagnostics_section import DiagnosticsSectionMixin
 from app.gui.sections.settings_section import SettingsSectionMixin
 from app.gui.sections.users_section import UsersSectionMixin
 from app.gui.sections.keys_section import KeysSectionMixin
+from app.gui.sections.api_tester_section import ApiTesterSectionMixin
 from app.core.settings import UserRole
 from app.config import SESSION_FILE, USERS_FILE
 from app.core.session_state import load_session_state
+from app.core.session_key_storage import SessionKeyStorage
 from app.core.user_store import load_users, save_users
 from app.db.database import init_db
 from app.core.users import UserAccount, create_user
 
 
 class MainWindow(
-    DiagnosticsSectionMixin, SettingsSectionMixin, UsersSectionMixin, KeysSectionMixin, ctk.CTk
+    DiagnosticsSectionMixin,
+    SettingsSectionMixin,
+    UsersSectionMixin,
+    KeysSectionMixin,
+    ApiTesterSectionMixin,
+    ctk.CTk,
 ):
     def __init__(self) -> None:
         super().__init__()
@@ -61,8 +68,21 @@ class MainWindow(
         self.keys_check_name_entry: ctk.CTkEntry | None = None
         self.keys_output: ctk.CTkTextbox | None = None
 
+        self.api_tester_section_option: ctk.CTkOptionMenu | None = None
+        self.api_tester_method_option: ctk.CTkOptionMenu | None = None
+        self.api_tester_path_entry: ctk.CTkEntry | None = None
+        self.api_tester_body_textbox: ctk.CTkTextbox | None = None
+        self.api_tester_temp_key_entry: ctk.CTkEntry | None = None
+        self.api_tester_key_option: ctk.CTkOptionMenu | None = None
+        self.api_tester_save_checkbox: ctk.CTkCheckBox | None = None
+        self.api_tester_message_label: ctk.CTkLabel | None = None
+        self.api_tester_output: ctk.CTkTextbox | None = None
+
         init_db()
         self.key_storage = EncryptedFileKeyStorage()
+        # Только в памяти процесса — временный ключ из API Tester (Test
+        # mode) никогда не должен попасть на диск, в отличие от Keys.
+        self.session_key_storage = SessionKeyStorage()
 
         self._build_layout()
         self._load_users_on_start()
@@ -193,6 +213,10 @@ class MainWindow(
             "Settings": "Configure app settings, storage modes and access rules here.",
             "Users": "Manage manager accounts and roles here.",
         }
+
+        if section_name == "API Tester":
+            self._show_api_tester_section()
+            return
 
         if section_name == "Keys":
             self._show_keys_section()

@@ -96,6 +96,25 @@ def get_scopes_with_ping_urls(bitmask: int) -> list[tuple[int, str, str | None]]
     ]
 
 
+def get_scope_hosts() -> list[tuple[str, str]]:
+    """
+    Все разделы API вместе с их базовым хостом (без маски прав — это не
+    "что доступно этому токену", а полный список разделов WB API).
+
+    Нужно API Tester: у WB нет единого домена для всех методов, у каждого
+    раздела свой хост (content-api, statistics-api, ...) — значит выбор
+    раздела должен определять base_url запроса, а не только показывать
+    имя. Хост получаем из ping URL, отбросив суффикс "/ping". "Read only"
+    пропускаем — это флаг токена, а не раздел с собственным API (у него и
+    ping URL нет).
+    """
+    return [
+        (name, url.removesuffix("/ping"))
+        for _bit, (name, url) in sorted(WB_SCOPES.items())
+        if url is not None
+    ]
+
+
 def token_info(token: str, now: int | None = None) -> dict:
     """
     Собрать полную информацию о токене для дашборда.
