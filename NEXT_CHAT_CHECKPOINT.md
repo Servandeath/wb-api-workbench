@@ -15,6 +15,12 @@
 Портфолио-проект: внешний API, GUI, локальное хранение, безопасное
 хранение ключей, ролевая модель доступа.
 
+Отдельно зафиксировано (см. project instructions зонтичного проекта):
+это НЕ аналитическая платформа по кабинету — та идея изначально и
+осознанно живёт в соседнем репозитории wb-boss-widget (дашборд метрик
+по нескольким кабинетам). wb-api-workbench с первого коммита — про
+ключи/роли/тестер API, roadmap.md это подтверждает с самого начала.
+
 ## Стек
 
 Python 3.11+, customtkinter, SQLAlchemy + SQLite (подключено — init_db()
@@ -43,85 +49,87 @@ Git:
 ## Структура проекта
 
     app/
-      config.py            пути, DATABASE_URL, USERS_FILE
+      config.py            пути, DATABASE_URL, USERS_FILE, SESSION_FILE
       main.py               точка входа
       core/
         permissions.py     PERMISSIONS (матрица прав) на settings.UserRole — единый enum ролей
-        settings.py        UserRole, AppMode, apply_settings
+        settings.py        UserRole, AppMode, apply_settings, can_use_real_mode
+        session_state.py   load/save_session_state — role+mode переживают перезапуск (data/session.json)
         users.py           UserAccount + логика (create/add/find/change/deactivate)
         user_store.py      JSON-персистентность пользователей
         diagnostics.py     самопроверка окружения
-        token_utils.py     mask_token (общий для key_storage/encrypted_file_storage)
+        token_utils.py     mask_token + mask_ozon_credentials (Ozon — JSON, маскируем поля отдельно)
         key_storage.py     ключи через keyring
         encrypted_file_storage.py  ключи в зашифрованном файле (Fernet)
-        session_key_storage.py     ключ в памяти сессии
-        http_client.py     WB HTTP-клиент (httpx), из GUI пока не используется
-        wb_token.py         декодер JWT WB (oid/sid, тип, scopes+ping URL, срок, "for")
+        session_key_storage.py     ключ в памяти сессии (используется в API Tester, Test mode)
+        http_client.py     WBHttpClient — НЕ используется нигде (см. "Заглушки" ниже, там же почему)
+        wb_token.py         декодер JWT WB (oid/sid, тип, scopes+ping URL, срок, "for"),
+                             + get_scope_hosts() — базовый хост на каждый раздел API (для API Tester)
         wb_ping.py          пинг разделов WB API по битам токена, сводка статуса
         ozon_ping.py         Ozon: проверка Seller (Client-Id+Api-Key) и Performance
                               (Client ID+Client Secret, OAuth2) — ключ непрозрачный, декодера нет
         marketplace.py      Marketplace, KeyKind — метаданные для ApiKey
+        api_tester.py       parse_json_body, send_wb_request (прямой httpx, не через http_client —
+                             у него raise_for_status() глотает тело ошибочных ответов)
       gui/
-        main_window.py     основное окно, рабочие разделы (включая Keys)
-        api_tester.py      заглушка
-        key_manager.py     заглушка (логика Keys живёт в main_window.py, не здесь)
-        json_viewer.py     заглушка
-        login_window.py    заглушка (реального логина нет, роль = дропдаун в Settings)
+        main_window.py     тонкий каркас (~250 строк): __init__, layout/sidebar/topbar,
+                            show_section-диспетчер. Разделы вынесены в sections/ миксинами
+                            (main_window.py был 978 строк одним классом — разобрали один в один
+                            с разделами GUI, методы переехали почти без правок).
+        sections/
+          diagnostics_section.py  DiagnosticsSectionMixin
+          settings_section.py    SettingsSectionMixin (+ сохраняет session_state при Apply)
+          users_section.py       UsersSectionMixin (весь раздел скроллится одним CTkScrollableFrame)
+          keys_section.py        KeysSectionMixin (WB + Ozon, самый большой, ~430 строк)
+          api_tester_section.py  ApiTesterSectionMixin (см. раздел ниже)
+        MainWindow(DiagnosticsSectionMixin, SettingsSectionMixin, UsersSectionMixin,
+                   KeysSectionMixin, ApiTesterSectionMixin, ctk.CTk) — набирает разделы
+                   через наследование, каждый метод обращается к self как раньше.
       db/
         database.py        engine, SessionLocal, init_db (вызывается при старте GUI)
         models.py          ApiKey (+marketplace/key_kind), ApiRequestLog
         key_repository.py  CRUD ApiKey
         request_log_repository.py  CRUD ApiRequestLog
       storage/
-        raw_json.py        сохранение raw JSON
-    tests/                 101 тестов (permissions, settings, users, user_store,
-                            diagnostics, wb_token, wb_ping, ozon_ping, db-слой)
+        raw_json.py        сохранение raw JSON (пока нигде не вызывается, задел под Imports)
+    tests/                 127 тестов (permissions, settings, session_state, users, user_store,
+                            token_utils, api_tester, diagnostics, wb_token, wb_ping, ozon_ping, db-слой)
     docs/                  architecture, permissions, roadmap
     reference/             боевые GAS-скрипты (WB/Ozon key checker) как референс
                             логики; в .gitignore, не часть кодовой базы
 
-## Текущее состояние (v0.3 / GUI MVP в работе)
+## Текущее состояние (v0.4 — API и данные, в работе)
 
 Core — готово и покрыто тестами:
-- ролевая модель (Viewer / Tester / Operator / Admin), единая матрица прав
-  (permissions.PERMISSIONS keyed by settings.UserRole — раньше были два
-  параллельных enum'а, свели в один);
-- режимы Test / Real с правилом доступа к Real;
-- логика пользователей: создание, защита от дублей (без учёта регистра),
-  поиск, смена роли, деактивация;
-- JSON-персистентность пользователей (user_store);
-- диагностика окружения;
+- ролевая модель (Viewer / Tester / Operator / Admin), единая матрица прав;
+- режимы Test / Real с правилом доступа к Real; выбор role/mode переживает
+  перезапуск приложения (session_state.py, data/session.json);
+- логика пользователей: создание, защита от дублей, поиск, смена роли,
+  деактивация, JSON-персистентность;
 - три варианта хранения ключей (keyring / шифрованный файл / сессия);
-- декодер JWT-ключей WB (wb_token): кабинет (oid, с fallback на sid),
-  тип, права по битам (scopes + ping URL на раздел), срок действия, "for";
-- пинг живости ключа: wb_ping (WB, по разделам bitmask) и ozon_ping
-  (Ozon Seller + Performance — два независимых типа credentials,
-  ключ непрозрачный, декодера нет, только live-check);
-- БД-слой подключён: init_db() вызывается при старте GUI, репозитории
-  key_repository/request_log_repository (полный CRUD) поверх ApiKey/
-  ApiRequestLog; ApiKey несёт marketplace/key_kind (app.core.marketplace) —
-  один и тот же формат хранит и WB JWT, и Ozon Seller/Performance.
+- декодер JWT-ключей WB (wb_token): кабинет, тип, права по битам, срок
+  действия, "for" + список всех разделов API с их базовым хостом
+  (get_scope_hosts — у каждого раздела WB свой домен, единого нет);
+- пинг живости ключа: wb_ping (WB) и ozon_ping (Ozon Seller + Performance);
+- маскировка секретов для списка: mask_token (WB, сырой JWT) и отдельно
+  mask_ozon_credentials (Ozon — JSON, маскируем client_id/api_key по
+  полям, а не байты JSON целиком);
+- БД-слой: init_db(), key_repository/request_log_repository (полный CRUD);
+- api_tester.py: разбор JSON-тела запроса, прямой HTTP-вызов к WB
+  (не через http_client — см. "Заглушки").
 
-GUI — рабочие разделы:
-- каркас приложения (sidebar, topbar, статус Role/Mode/Key);
-- Diagnostics (кнопка Run Diagnostics);
-- Settings (выбор роли и режима, проверка запрещённых комбинаций);
-- Users (полностью рабочий): создание с защитой от дублей,
-  смена роли, деактивация, сохранение в JSON, загрузка при старте,
-  автосоздание admin если файла нет, доступ к разделу через
-  has_permission(role, "manage_users");
-- Keys (полный цикл, WB + Ozon; см. раздел ниже) — построено, прошло
-  скриптовый смоук-тест, ждёт ручной проверки в реальном Tk (ты как раз
-  этим занимаешься).
+GUI — все разделы рабочие:
+- каркас (sidebar, topbar, статус Role/Mode/Key), main_window.py разобран
+  на миксины по разделам (app/gui/sections/);
+- Diagnostics, Settings (сохраняет role/mode в session_state);
+- Users — полностью рабочий, вся секция в одном CTkScrollableFrame
+  (форма + список не могут схлопнуться друг под друга в маленьком окне);
+- Keys — полный цикл WB + Ozon: сохранение, проверка живости, список
+  с масками (Ozon — читаемая маска по полям);
+- API Tester — новый раздел (см. подробности ниже).
 
-Пользователи переживают перезапуск приложения (data/users.json,
-в .gitignore — локальные данные).
-
-Тесты: 101 passed (в песочнице ревьюера дополнительно 1 ожидаемый fail —
-там Python 3.10, а diagnostics проверяет >=3.11; у тебя локально не фейлит).
-GUI-код тестами не покрыт (нет реального Tk в песочнице ревьюера) — Keys
-проверен скриптовым смоук-тестом на поддельном customtkinter + один
-ручной прогон с реальным WB-токеном.
+Тесты: 127 passed. GUI-код тестами не покрыт (нет реального Tk в
+песочнице ревьюера) — только ручная проверка на твоей стороне.
 
 ## Хранение секретов ключей (кто спросит — вот ответ)
 
@@ -133,59 +141,65 @@ GUI-код тестами не покрыт (нет реального Tk в п�
 - Метаданные (имя, marketplace, key_kind, ТОЛЬКО маскированный токен,
   storage_type, is_active, created_at, last_used_at) — SQLite,
   data/wb_workbench.db. Сырой секрет туда никогда не попадает.
-Оба пути (data/secure/, *.db) в .gitignore.
+- Временный ключ из API Tester (Test mode) — только в памяти процесса
+  (session_key_storage.py), на диск не попадает вообще, теряется при
+  закрытии приложения. Это осознанно: Test mode — для разового поиска,
+  не для хранения.
+Оба файловых пути (data/secure/, *.db) в .gitignore.
 
 ## Заглушки / не подключено
 
-- GUI: API Tester, Imports, History (плейсхолдеры) — весь core под них
-  (http_client, декодер, пинг WB/Ozon, БД-репозитории) готов, но не отрисован;
-- http_client готов, но из GUI не используется (ping-модули дёргают
-  httpx напрямую, у http_client другая задача — реальные вызовы методов
-  API Tester, raise_for_status там кстати не подходит для ping-сценариев);
+- GUI: Imports, History — плейсхолдеры, ждут своей очереди (raw_json.py
+  и request_log_repository.list_request_logs под них уже готовы);
+- http_client.py (WBHttpClient) по-прежнему нигде не используется и
+  вдобавок сейчас точно неправильный: у него один захардкоженный
+  base_url ("seller-api.wildberries.ru"), а у WB такого единого домена
+  нет вообще — у каждого раздела API свой хост (см. wb_token.WB_SCOPES /
+  get_scope_hosts). Это всплыло при постройке API Tester — там ту же
+  проблему решили через get_scope_hosts() + собственный api_tester.py,
+  http_client.py в стороне остался нетронутым и по-прежнему сломанным
+  для реального использования. Решить: чинить (на per-раздел base_url)
+  или удалить как мёртвый/неверный код — он и так дублирует то, что
+  теперь есть в api_tester.py;
 - кэширование результата пинга (как в reference-скриптах, по хэшу+дню) —
   не портировано, каждый клик Check в Keys — новый live-запрос;
-- логина нет (login_window.py — заглушка): роль сейчас просто дропдаун
-  в Settings без всякой проверки личности, любой может выставить себе Admin.
+- логина нет (роль — просто дропдаун в Settings без проверки личности).
 
 ## Известные проблемы и бэклог
 
-- Users: список пользователей без скроллбара, обрезается в маленьком окне
-  (в полный экран видно). Быстрая добивка: CTkScrollableFrame.
-- Keys: список тоже обычный CTkTextbox без построчных кнопок — "Check"
-  сделан через отдельное поле "имя ключа" (как manage-паттерн в Users),
-  не клик по строке. Апгрейд до реальной таблицы — отдельная задача.
+- Keys: список — обычный текстовый вывод без построчных кнопок, "Check"
+  через отдельное поле "имя ключа" (как manage-паттерн в Users), не клик
+  по строке. Апгрейд до реальной таблицы — отдельная задача.
 - Keys: кнопка Check завязана на то же право add_key (Admin), что и
   сохранение — по смыслу это ближе к "использовать ключ", чем к
   "изменить хранилище". Матрица прав не даёт отдельного права под это,
-  осознанно не стал придумывать новое значение сам.
-- Keys: masked_token для Ozon выглядит криво (mask_token считался под
-  сырую JWT-строку, а тут JSON) — работает, но косметически не очень.
-- can_manage_users(role) в users.py осталась (и её тесты), но в GUI больше
-  не используется — решить, удалять или оставить как утилиту.
+  осознанно не стал придумывать новое значение сам — решить отдельно.
+- http_client.py — см. "Заглушки" выше, решить судьбу.
 - Реальная аутентификация не спроектирована — отдельный большой разговор,
   когда дойдёт очередь.
 
 ## Ошибки, найденные и исправленные по ходу
 
-- В рабочей копии были порезаны users.py и test_users.py (потеряна логика
-  дублей и часть тестов) — восстановлено.
-- 4 нерабочих GUI-черновика (users_gui_*.py) ссылались на несуществующие
-  модули — удалены.
-- Двойной append при создании пользователя в GUI — убран.
-- В GUI вызывался create_user вместо add_user (не ловил дубли,
-  не добавлял в список) — заменён на add_user.
-- init_db() вызывал Base.metadata.create_all(), но models.py нигде не
-  импортировался по пути вызова из GUI — создавался файл БД без единой
-  таблицы, молча. Починено импортом models внутри init_db(); есть
-  regression-тест в отдельном subprocess (иначе баг маскируется —
-  другие тесты в общем прогоне уже импортировали models).
-- Текст в разделе Users утверждал "data is temporary for this session" —
-  устарело с тех пор, как подключили save_users в JSON. Поправлено.
-- Keys: поле ввода WB-токена/Ozon-секрета не маскировалось (show="*" не
-  стоял) и не очищалось после сохранения — секрет висел открытым текстом
-  в форме сколько угодно. Нашли ручным тестом. Поправлено: маскировка на
-  секрет-полях (client_id не трогали, он не секрет) + очистка всех полей
-  формы после успешного Save.
+- В рабочей копии были порезаны users.py и test_users.py — восстановлено.
+- 4 нерабочих GUI-черновика (users_gui_*.py) — удалены.
+- init_db() не импортировал models.py по пути вызова из GUI — создавал
+  файл БД без единой таблицы, молча. Починено.
+- Keys: поле ввода WB-токена/Ozon-секрета не маскировалось и не
+  очищалось после сохранения — секрет висел открытым текстом в форме.
+  Поправлено.
+- Users: форма + список без скролла обрезались в небольшом окне (видно
+  было только в развёрнутом). Пробовали закрепить форму и скроллить
+  только список — не сработало (форме самой не хватало места, списку
+  доставалось 0px). Решение — скроллить всю секцию одним контейнером.
+- Keys: masked_token для Ozon был кашей из байт JSON (mask_token считал
+  под сырую JWT-строку, а тут JSON-объект) — заменено на
+  mask_ozon_credentials, маскирует значения полей по отдельности.
+- can_manage_users(role) в users.py дублировала has_permission(role,
+  "manage_users") и была не подключена к GUI — удалена вместе с тестами.
+- API Tester изначально бил на несуществующий домен ("seller-api.
+  wildberries.ru" по образцу http_client.py) — у WB нет единого хоста,
+  у каждого раздела свой. Поправлено через wb_token.get_scope_hosts() +
+  dropdown "Section" в форме, который определяет base_url запроса.
 
 ## Правила работы
 
@@ -194,58 +208,59 @@ GUI-код тестами не покрыт (нет реального Tk в п�
 - Для каждого раздела: core-логика + pytest-тесты + проверка в GUI.
 - Команды для PowerShell, по одной за раз.
 
-## Раздел Keys (core + GUI построены, идёт ручная проверка)
+## Раздел Keys (готово, WB + Ozon)
 
-Цель: админка учёта и контроля ключей доступа к WB/Ozon API (и дальше —
-другим маркетплейсам, если у них появится смысл проверять ключи;
-Lamoda/Деловые линии/МойСклад/МоЕх — ключи практически бессрочные с
-полным доступом, для них ping-проверка сейчас не нужна).
+Core (всё с тестами): wb_token.py (декодер JWT WB), wb_ping.py (пинг по
+bitmask), ozon_ping.py (Ozon Seller + Performance), marketplace.py
+(Marketplace/KeyKind), db/models.py + key_repository.py (CRUD).
 
-Core (всё с тестами):
-- wb_token.py — декодер JWT WB (oid/sid, тип, scopes+ping URL, срок, "for").
-  Золотой образец — реальный токен в test_wb_token.py.
-- wb_ping.py — пинг разделов WB API по bitmask, сводка статуса
-  (200 у любого раздела -> OK, иначе 401 -> 429 -> 403 -> ERROR).
-  Логика 1-в-1 портирована из reference/api_key_stats.gs.
-- ozon_ping.py — Ozon Seller (Client-Id+Api-Key, POST /v3/product/list)
-  и Performance (Client ID+Client Secret, OAuth2 client_credentials).
-  Портировано из reference/ozon_key_stats.gs. У Ozon ключ непрозрачный —
-  декодера нет, только live-check, и credentials двух разных типов.
-- marketplace.py — Marketplace (WB/OZON), KeyKind (jwt/seller/performance).
-- db/models.py ApiKey несёт marketplace+key_kind — одна таблица для обоих
-  маркетплейсов. key_repository.py — полный CRUD поверх неё.
+GUI (app/gui/sections/keys_section.py): marketplace-дропдаун (WB/Ozon) с
+динамическими полями, Ozon — свой дропдаун Seller/Performance. Save
+валидирует WB-токен через token_info() до записи, проверяет дубль имени
+до записи секрета. Check по имени — расшифровывает, вызывает wb_ping/
+ozon_ping, синхронно (asyncio.run в обработчике клика, GUI на время
+запроса подвисает — вынесение в фон на будущее). Список с масками,
+Refresh. Права: view_masked_keys (все роли) — виден список, add_key
+(только Admin) — виден блок добавления/проверки.
 
-GUI (main_window.py, раздел Keys):
-- Marketplace-дропдаун (WB/Ozon), поля перестраиваются динамически;
-  для Ozon — свой дропдаун Seller/Performance, тоже динамические поля.
-- Save: WB-токен валидируется через token_info() до сохранения (кривой
-  токен отклоняется с сообщением, не сохраняется). Ozon-credentials
-  сериализуются в JSON и идут в тот же encrypted_file_storage — его
-  менять не пришлось, он и так хранит произвольную строку под именем.
-  Проверка на дубль имени — до записи секрета, не после (иначе дубль
-  мог тихо переписать чужой секрет в файле).
-- Check по имени: расшифровывает секрет, вызывает wb_ping/ozon_ping
-  по marketplace/key_kind, проставляет is_active. Синхронно (asyncio.run
-  внутри обработчика клика) — на время запроса GUI подвисает, для WB
-  это может быть несколько секунд (пинг нескольких разделов с паузой).
-  Вынесение в фон — на будущее.
-- Список сохранённых ключей с масками, кнопка Refresh.
-- Права по матрице: view_masked_keys (все роли) — виден список,
-  add_key (только Admin) — виден блок добавления/проверки.
+## Раздел API Tester (новое, готово)
 
-Проверено: скриптовый смоук-тест (poddельный customtkinter, реального
-Tk в песочнице ревьюера нет) — сохранение WB + оба типа Ozon, защита от
-дублей, Check с замоканной сетью, Viewer/Admin-гейтинг, переключение по
-всем разделам без исключений. Плюс твой первый ручной прогон с реальным
-WB-токеном нашёл реальный баг (см. "Ошибки" выше) — уже поправлено.
+Цель: "тестирование методов Wildberries API" из README — форма для
+ручных GET/POST запросов к WB, без каталога методов (строить его —
+по сути работа api-crash-dog, отдельного проекта; не дублируем).
+
+Источник ключа зависит от режима (см. docs/permissions.md):
+- Test mode (Tester+): временный ключ вписывается прямо в форму,
+  живёт только в памяти (session_key_storage.py), право
+  run_test_request;
+- Real mode (Operator/Admin): выбор одного из уже сохранённых WB-ключей
+  из Keys по имени, расшифровка через тот же key_storage, право
+  run_real_request.
+
+Форма: Section (dropdown из wb_token.get_scope_hosts() — определяет
+base_url, у каждого раздела WB свой домен) -> Method (GET/POST) -> Path
+-> JSON body (для POST). Send отправляет запрос напрямую через httpx
+(api_tester.send_wb_request), не через http_client.py — там
+raise_for_status() прячет тело ошибочных ответов, а тестеру как раз
+важно видеть 400/401/429 с телом, а не поймать исключение.
+
+"Save response" (чекбокс, право save_test_response/save_response по
+режиму) — пишет метод/путь/тело/ответ/статус в request_log_repository
+(История запросов, раздел History её пока не показывает — сам раздел
+ещё не отрисован).
+
+Права по ролям для формы: Viewer видит форму, но без Send/полей ключа
+(view_api_methods есть у всех, run_*_request — нет). Проверено вручную
+в реальном Tk с реальным сохранённым WB-ключом.
 
 ## Следующий шаг
 
-Ты сейчас гоняешь GUI руками (реальный Tk, реальные токены). По итогам —
-чинить найденное, потом ещё раз прогнать, сделать скриншоты для README,
-снова обновить README/checkpoint. Параллельно в очереди, не начато:
-- кэш результата пинга (data/cache/, уже зарезервирован в config.py) —
-  без него Check дёргает живой API на каждый клик;
-- реальная таблица для списка ключей вместо CTkTextbox;
-- API Tester поверх http_client.
-Быстрая добивка вне очереди: скролл в списке Users (CTkScrollableFrame).
+Пул мелких правок и рефакторинга main_window.py закрыт, API Tester
+построен и проверен. Дальше по roadmap.md (v0.4 → v1.0), не начато:
+- Imports (импорт JSON/CSV/Excel) и History (просмотр request_log) —
+  core под них уже есть (raw_json.py, list_request_logs);
+- кэш результата пинга в Keys (data/cache/, зарезервировано в config.py);
+- реальная таблица для списка ключей в Keys;
+- решить судьбу http_client.py (чинить per-раздел base_url или удалить);
+- реальная аутентификация — отдельный большой разговор;
+- актуальные скриншоты для README (текущие — до всех этих правок).
