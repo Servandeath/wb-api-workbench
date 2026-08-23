@@ -7,6 +7,7 @@ from app.gui.sections.settings_section import SettingsSectionMixin
 from app.gui.sections.users_section import UsersSectionMixin
 from app.gui.sections.keys_section import KeysSectionMixin
 from app.gui.sections.api_tester_section import ApiTesterSectionMixin
+from app.gui.sections.history_section import HistorySectionMixin
 from app.core.settings import UserRole
 from app.config import SESSION_FILE, USERS_FILE
 from app.core.session_state import load_session_state
@@ -22,6 +23,7 @@ class MainWindow(
     UsersSectionMixin,
     KeysSectionMixin,
     ApiTesterSectionMixin,
+    HistorySectionMixin,
     ctk.CTk,
 ):
     def __init__(self) -> None:
@@ -78,6 +80,8 @@ class MainWindow(
         self.api_tester_message_label: ctk.CTkLabel | None = None
         self.api_tester_output: ctk.CTkTextbox | None = None
 
+        self.history_output: ctk.CTkTextbox | None = None
+
         init_db()
         self.key_storage = EncryptedFileKeyStorage()
         # Только в памяти процесса — временный ключ из API Tester (Test
@@ -119,10 +123,12 @@ class MainWindow(
         )
         title.pack(pady=(24, 20), padx=16)
 
+        # Imports убран из сайдбара — заглушка без данных и функционала
+        # (см. обсуждение в чате), не стоит показывать в портфолио-версии.
+        # Вернём, когда появится реальный импорт JSON/CSV/Excel.
         sections = [
             "API Tester",
             "Keys",
-            "Imports",
             "History",
             "Diagnostics",
             "Settings",
@@ -208,8 +214,6 @@ class MainWindow(
         descriptions = {
             "API Tester": "Test Wildberries API methods here.",
             "Keys": "Manage temporary, saved and encrypted API keys here.",
-            "Imports": "Import local JSON, CSV and Excel files here.",
-            "History": "View API request history and saved responses here.",
             "Settings": "Configure app settings, storage modes and access rules here.",
             "Users": "Manage manager accounts and roles here.",
         }
@@ -220,6 +224,10 @@ class MainWindow(
 
         if section_name == "Keys":
             self._show_keys_section()
+            return
+
+        if section_name == "History":
+            self._show_history_section()
             return
 
         if section_name == "Diagnostics":
