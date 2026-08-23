@@ -8,7 +8,7 @@ from app.core.marketplace import KeyKind, Marketplace
 from app.core.ozon_ping import check_performance_key, check_seller_key
 from app.core.permissions import has_permission
 from app.core.settings import UserRole
-from app.core.wb_ping import ping_token
+from app.core.wb_ping import ping_token_detailed, reduce_ping_results
 from app.core.token_utils import mask_ozon_credentials
 from app.core.wb_token import token_info
 from app.db.database import SessionLocal
@@ -51,67 +51,85 @@ class KeysSectionMixin:
         )
         description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
 
-        can_manage = has_permission(current_role, "add_key")
+        # Add и Check — разные права: сохранять/менять хранилище ключей
+        # может только Admin (add_key), а проверить, жив ли уже сохранённый
+        # ключ (Check) — это canned-скрипт (wb_ping/ozon_ping), ничего
+        # руками не пишешь, поэтому доступно и Tester/Operator
+        # (check_key_liveness). Раньше обе кнопки сидели за одним add_key.
+        can_add = has_permission(current_role, "add_key")
+        can_check = has_permission(current_role, "check_key_liveness")
         next_row = 2
 
-        if can_manage:
+        if can_add or can_check:
             form = ctk.CTkFrame(content, corner_radius=12)
             form.grid(row=2, column=0, padx=30, pady=(10, 20), sticky="new")
             form.grid_columnconfigure(1, weight=1)
 
-            marketplace_label = ctk.CTkLabel(form, text="Marketplace:")
-            marketplace_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+            row = 0
 
-            self.keys_marketplace_option = ctk.CTkOptionMenu(
-                form,
-                values=[Marketplace.WB.value, Marketplace.OZON.value],
-                command=lambda _choice: self._build_keys_credential_fields(),
+            if can_add:
+                marketplace_label = ctk.CTkLabel(form, text="Marketplace:")
+                marketplace_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+
+                self.keys_marketplace_option = ctk.CTkOptionMenu(
+                    form,
+                    values=[Marketplace.WB.value, Marketplace.OZON.value],
+                    command=lambda _choice: self._build_keys_credential_fields(),
+                )
+                self.keys_marketplace_option.set(Marketplace.WB.value)
+                self.keys_marketplace_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+                row += 1
+
+                self.keys_fields_frame = ctk.CTkFrame(form, fg_color="transparent")
+                self.keys_fields_frame.grid(row=row, column=0, columnspan=2, sticky="w")
+                row += 1
+
+                name_label = ctk.CTkLabel(form, text="Name:")
+                name_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+
+                self.keys_name_entry = ctk.CTkEntry(form, width=240)
+                self.keys_name_entry.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+                row += 1
+
+                save_button = ctk.CTkButton(
+                    form,
+                    text="Save Key",
+                    height=40,
+                    command=self._save_key_from_gui,
+                )
+                save_button.grid(row=row, column=0, padx=20, pady=(10, 5), sticky="w")
+                row += 1
+
+                self._build_keys_credential_fields()
+
+            if can_check:
+                check_label = ctk.CTkLabel(form, text="Check key by name:")
+                check_label.grid(row=row, column=0, padx=20, pady=(15, 5), sticky="w")
+
+                self.keys_check_name_entry = ctk.CTkEntry(form, width=240)
+                self.keys_check_name_entry.grid(row=row, column=1, padx=20, pady=(15, 5), sticky="w")
+                row += 1
+
+                check_button = ctk.CTkButton(
+                    form,
+                    text="Check",
+                    height=32,
+                    command=self._check_key_from_gui,
+                )
+                check_button.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="w")
+                row += 1
+
+            self.keys_message_label = ctk.CTkLabel(
+                form, text="", font=ctk.CTkFont(size=13), justify="left"
             )
-            self.keys_marketplace_option.set(Marketplace.WB.value)
-            self.keys_marketplace_option.grid(row=0, column=1, padx=20, pady=15, sticky="w")
-
-            self.keys_fields_frame = ctk.CTkFrame(form, fg_color="transparent")
-            self.keys_fields_frame.grid(row=1, column=0, columnspan=2, sticky="w")
-
-            name_label = ctk.CTkLabel(form, text="Name:")
-            name_label.grid(row=2, column=0, padx=20, pady=15, sticky="w")
-
-            self.keys_name_entry = ctk.CTkEntry(form, width=240)
-            self.keys_name_entry.grid(row=2, column=1, padx=20, pady=15, sticky="w")
-
-            save_button = ctk.CTkButton(
-                form,
-                text="Save Key",
-                height=40,
-                command=self._save_key_from_gui,
-            )
-            save_button.grid(row=3, column=0, padx=20, pady=(10, 5), sticky="w")
-
-            check_label = ctk.CTkLabel(form, text="Check key by name:")
-            check_label.grid(row=4, column=0, padx=20, pady=(15, 5), sticky="w")
-
-            self.keys_check_name_entry = ctk.CTkEntry(form, width=240)
-            self.keys_check_name_entry.grid(row=4, column=1, padx=20, pady=(15, 5), sticky="w")
-
-            check_button = ctk.CTkButton(
-                form,
-                text="Check",
-                height=32,
-                command=self._check_key_from_gui,
-            )
-            check_button.grid(row=5, column=0, padx=20, pady=(0, 10), sticky="w")
-
-            self.keys_message_label = ctk.CTkLabel(form, text="", font=ctk.CTkFont(size=13))
             self.keys_message_label.grid(
-                row=6,
+                row=row,
                 column=0,
                 columnspan=2,
                 padx=20,
                 pady=(0, 20),
                 sticky="w",
             )
-
-            self._build_keys_credential_fields()
 
             next_row = 3
 
@@ -364,7 +382,7 @@ class KeysSectionMixin:
                 return
 
             try:
-                status = self._run_key_check(api_key.marketplace, api_key.key_kind, secret)
+                status, detail = self._run_key_check(api_key.marketplace, api_key.key_kind, secret)
             except Exception as error:
                 self._set_keys_message(f"Check failed: {error}")
                 return
@@ -377,20 +395,34 @@ class KeysSectionMixin:
         finally:
             session.close()
 
-        self._set_keys_message(f"Checked {name}: {status}")
+        message = f"Checked {name}: {status}"
+        if detail:
+            message += f"\n{detail}"
+        self._set_keys_message(message)
         self._refresh_keys_list()
 
-    def _run_key_check(self, marketplace: str, key_kind: str, secret: str) -> str:
+    def _run_key_check(self, marketplace: str, key_kind: str, secret: str) -> tuple[str, str | None]:
         """
         Синхронная обёртка вокруг async-проверок wb_ping/ozon_ping.
 
         Блокирует GUI на время запроса(ов) — для WB это может быть
         несколько секунд (пинг нескольких разделов с паузой между ними).
         Приемлемо для v1, вынесение в отдельный поток — на будущее.
+
+        Возвращает (агрегированный статус, детальная расшифровка по
+        разделам | None). Для WB детализация — по разделам API (Content,
+        Analytics, ...), т.к. один токен покрывает несколько разделов и
+        они могут отвечать по-разному. Для Ozon такого деления нет —
+        один seller/performance ключ = один статус, detail всегда None.
         """
         if marketplace == Marketplace.WB.value:
             info = token_info(secret)
-            return asyncio.run(ping_token(secret, info["bitmask"]))
+            results = asyncio.run(ping_token_detailed(secret, info["bitmask"]))
+            if not results:
+                return "NO_SCOPES", None
+            status = reduce_ping_results([code for _name, code in results])
+            detail = "\n".join(f"  {name}: {code}" for name, code in results)
+            return status, detail
 
         credentials = json.loads(secret)
 
@@ -405,7 +437,7 @@ class KeysSectionMixin:
                 )
 
         result = asyncio.run(check())
-        return result["status"]
+        return result["status"], None
 
     def _refresh_keys_list(self) -> None:
         if self.keys_output is None:

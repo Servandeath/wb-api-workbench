@@ -65,7 +65,10 @@ def check_permissions() -> DiagnosticResult:
         has_permission(UserRole.ADMIN, "add_key") is True,
         has_permission(UserRole.VIEWER, "add_key") is False,
         has_permission(UserRole.OPERATOR, "run_real_request") is True,
-        has_permission(UserRole.TESTER, "run_test_request") is True,
+        # Tester больше не гоняет свободные запросы (см. permissions.py) —
+        # ему доступна только canned-проверка живости ключа.
+        has_permission(UserRole.TESTER, "check_key_liveness") is True,
+        has_permission(UserRole.TESTER, "run_test_request") is False,
     ]
 
     if all(checks):

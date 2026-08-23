@@ -3,7 +3,7 @@ import asyncio
 import httpx
 
 from app.core import wb_ping
-from app.core.wb_ping import ping_token, ping_url, reduce_ping_results
+from app.core.wb_ping import ping_token, ping_token_detailed, ping_url, reduce_ping_results
 
 
 def run(coro):
@@ -112,3 +112,60 @@ def test_ping_token_pings_every_scope_and_reduces(monkeypatch):
 
     assert len(calls) == 2
     assert result == "OK"  # Content returns 200, so OK wins even though Analytics is 401
+
+
+def test_ping_token_detailed_returns_empty_list_when_no_ping_urls(monkeypatch):
+    monkeypatch.setattr(wb_ping, "PING_SLEEP_SECONDS", 0)
+
+    read_only_bitmask = 2 ** 30
+
+    assert run(ping_token_detailed("token", read_only_bitmask)) == []
+
+
+def test_ping_token_detailed_returns_per_scope_codes_not_reduced(monkeypatch):
+    monkeypatch.setattr(wb_ping, "PING_SLEEP_SECONDS", 0)
+
+    def handler(request):
+        if "seller-analytics-api" in str(request.url):
+            return httpx.Response(401)
+        return httpx.Response(200)
+
+    real_async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda *a, **k: real_async_client(transport=httpx.MockTransport(handler)),
+    )
+
+    bitmask = 2 ** 1 | 2 ** 2  # Content + Analytics
+
+    results = run(ping_token_detailed("token", bitmask))
+
+    # Не сведено в один статус - оба раздела видны отдельно, даже хотя
+    # ping_token() на этих же данных вернул бы просто "OK".
+    assert results == [("Content", 200), ("Analytics", 401)]
+
+
+def test_ping_token_uses_ping_token_detailed_under_the_hood(monkeypatch):
+    # ping_token() не должен пинговать те же URL второй раз отдельным
+    # кодом - он обязан быть построен поверх ping_token_detailed().
+    monkeypatch.setattr(wb_ping, "PING_SLEEP_SECONDS", 0)
+
+    calls = []
+
+    def handler(request):
+        calls.append(str(request.url))
+        return httpx.Response(200)
+
+    real_async_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        httpx,
+        "AsyncClient",
+        lambda *a, **k: real_async_client(transport=httpx.MockTransport(handler)),
+    )
+
+    bitmask = 2 ** 1  # Content only
+
+    run(ping_token("token", bitmask))
+
+    assert len(calls) == 1

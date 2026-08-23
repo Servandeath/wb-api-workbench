@@ -1,4 +1,4 @@
-"""
+﻿"""
 Проверка живости ключа: пинг разделов WB API, доступных токену по битам.
 
 Логика перенесена из боевого валидатора ключей
@@ -60,12 +60,19 @@ def reduce_ping_results(codes: list[int | str]) -> str:
     return "ERROR"
 
 
-async def ping_token(token: str, bitmask: int) -> str:
+async def ping_token_detailed(token: str, bitmask: int) -> list[tuple[str, int | str]]:
     """
-    Пропинговать все разделы, доступные токену по bitmask, вернуть сводный статус.
+    Пропинговать все разделы, доступные токену по bitmask, вернуть код
+    ответа КАЖДОГО раздела отдельно (не сведённый в один статус).
 
-    Разделы без ping URL (например Read only) пропускаются. Если у токена
-    нет ни одного раздела с URL, пинговать нечего — возвращается "NO_SCOPES".
+    Для Keys -> Check: пользователь без технического бэкграунда должен
+    видеть таблицу "раздел -> статус", а не гадать, что значит один общий
+    OK/401/403 (какой конкретно раздел не работает). Источник истины для
+    ping_token() ниже — он просто сводит этот же список в одну строку,
+    чтобы не пинговать одно и то же дважды.
+
+    Разделы без ping URL (например Read only) пропускаются. Пустой список
+    значит "пинговать нечего" (у токена нет ни одного раздела с URL).
     """
     scopes = [
         (name, url)
@@ -73,15 +80,28 @@ async def ping_token(token: str, bitmask: int) -> str:
         if url is not None
     ]
 
-    if not scopes:
-        return "NO_SCOPES"
-
-    codes: list[int | str] = []
+    results: list[tuple[str, int | str]] = []
 
     async with httpx.AsyncClient() as client:
-        for index, (_name, url) in enumerate(scopes):
+        for index, (name, url) in enumerate(scopes):
             if index:
                 await asyncio.sleep(PING_SLEEP_SECONDS)
-            codes.append(await ping_url(client, token, url))
+            results.append((name, await ping_url(client, token, url)))
 
+    return results
+
+
+async def ping_token(token: str, bitmask: int) -> str:
+    """
+    Пропинговать все разделы, доступные токену по bitmask, вернуть сводный статус.
+
+    Если у токена нет ни одного раздела с ping URL, пинговать нечего —
+    возвращается "NO_SCOPES".
+    """
+    results = await ping_token_detailed(token, bitmask)
+
+    if not results:
+        return "NO_SCOPES"
+
+    codes = [code for _name, code in results]
     return reduce_ping_results(codes)
