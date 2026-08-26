@@ -1,5 +1,6 @@
 import customtkinter as ctk
 
+from app.gui.layout import CONTENT_PADX
 from app.core.permissions import has_permission
 from app.core.settings import UserRole
 from app.db.database import SessionLocal
@@ -21,17 +22,12 @@ class HistorySectionMixin:
             return
 
         content = self._create_content_frame()
-        content.grid_rowconfigure(2, weight=1)
+        content.grid_rowconfigure(1, weight=1)
 
-        title = ctk.CTkLabel(
-            content,
-            text="History",
-            font=ctk.CTkFont(size=28, weight="bold"),
-        )
-        title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
-
+        # Заголовок раздела уже есть в topbar — второй раз тем же текстом
+        # его здесь не повторяем.
         header = ctk.CTkFrame(content, fg_color="transparent")
-        header.grid(row=1, column=0, sticky="ew", padx=30, pady=(0, 10))
+        header.grid(row=0, column=0, sticky="ew", padx=CONTENT_PADX, pady=(30, 10))
         header.grid_columnconfigure(0, weight=1)
 
         description = ctk.CTkLabel(
@@ -52,7 +48,7 @@ class HistorySectionMixin:
         refresh_button.grid(row=0, column=1, sticky="e", padx=(10, 0))
 
         self.history_output = ctk.CTkTextbox(content)
-        self.history_output.grid(row=2, column=0, padx=30, pady=(0, 30), sticky="nsew")
+        self.history_output.grid(row=1, column=0, padx=CONTENT_PADX, pady=(0, 30), sticky="nsew")
 
         self._refresh_history_list()
 

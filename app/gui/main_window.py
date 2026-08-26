@@ -1,6 +1,7 @@
 ﻿
 import customtkinter as ctk
 
+from app.gui.layout import CONTENT_PADX
 from app.core.encrypted_file_storage import EncryptedFileKeyStorage
 from app.gui.sections.diagnostics_section import DiagnosticsSectionMixin
 from app.gui.sections.settings_section import SettingsSectionMixin
@@ -191,14 +192,9 @@ class MainWindow(
         return content
 
     def _show_default_section(self, title: str, description: str) -> None:
+        # title дублировал topbar (там уже показано имя раздела) — второй
+        # раз тем же текстом его тут не рисуем, только описание.
         content = self._create_content_frame()
-
-        section_title = ctk.CTkLabel(
-            content,
-            text=title,
-            font=ctk.CTkFont(size=28, weight="bold"),
-        )
-        section_title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
 
         section_description = ctk.CTkLabel(
             content,
@@ -206,7 +202,7 @@ class MainWindow(
             font=ctk.CTkFont(size=16),
             justify="left",
         )
-        section_description.grid(row=1, column=0, padx=30, pady=10, sticky="nw")
+        section_description.grid(row=0, column=0, padx=CONTENT_PADX, pady=(30, 10), sticky="nw")
 
     def show_section(self, section_name: str) -> None:
         self.current_section = section_name

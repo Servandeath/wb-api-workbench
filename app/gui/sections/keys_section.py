@@ -4,6 +4,17 @@ import json
 import customtkinter as ctk
 import httpx
 
+from app.gui.layout import (
+    CONTENT_PADX,
+    ENTRY_WIDTH,
+    ENTRY_WIDTH_WIDE,
+    FIELD_PADX,
+    FIELD_PADY,
+    LABEL_WIDTH,
+    PANEL_CORNER_RADIUS,
+    PANEL_GAP,
+    build_group_header,
+)
 from app.core.marketplace import KeyKind, Marketplace
 from app.core.ozon_ping import check_performance_key, check_seller_key
 from app.core.permissions import has_permission
@@ -32,22 +43,22 @@ class KeysSectionMixin:
             return
 
         content = self._create_content_frame()
+        # _create_content_frame даёт weight=1 строке 2 по умолчанию — после
+        # удаления дублирующего заголовка на этой строке иногда оказывается
+        # message_label, а не растягиваемый список. Сбрасываем дефолт,
+        # настоящий вес строке списка ставим ниже явно (next_row).
         content.grid_rowconfigure(2, weight=0)
 
-        title = ctk.CTkLabel(
-            content,
-            text="Keys",
-            font=ctk.CTkFont(size=28, weight="bold"),
-        )
-        title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
-
+        # Заголовок раздела уже есть в topbar (см. MainWindow.show_section) —
+        # повторять его здесь второй раз тем же текстом было чистым
+        # дублированием. Оставляем только описание.
         description = ctk.CTkLabel(
             content,
             text="Store and check WB and Ozon API keys.",
             font=ctk.CTkFont(size=16),
             justify="left",
         )
-        description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
+        description.grid(row=0, column=0, padx=CONTENT_PADX, pady=(30, 10), sticky="w")
 
         # Add и Check — разные права: сохранять/менять хранилище ключей
         # может только Admin (add_key), а проверить, жив ли уже сохранённый
@@ -61,7 +72,7 @@ class KeysSectionMixin:
         # был руками читать encrypted_keys.json. view_full_key был заведён
         # в правах заранее, но нигде не использовался — вот его применение.
         can_copy = has_permission(current_role, "view_full_key")
-        next_row = 2
+        next_row = 1
 
         # Add и Check/Copy — два независимых блока в один столбец каждый.
         # Раньше все три сидели в одной узкой форме, а справа от неё
@@ -75,44 +86,47 @@ class KeysSectionMixin:
 
         if has_add_panel or has_check_panel:
             top_row = ctk.CTkFrame(content, fg_color="transparent")
-            top_row.grid(row=2, column=0, padx=30, pady=(10, 10), sticky="new")
+            top_row.grid(row=1, column=0, padx=CONTENT_PADX, pady=(10, 10), sticky="new")
             top_row.grid_columnconfigure(0, weight=1)
             top_row.grid_columnconfigure(1, weight=1)
 
             if has_add_panel:
-                add_panel = ctk.CTkFrame(top_row, corner_radius=12)
+                add_panel = ctk.CTkFrame(top_row, corner_radius=PANEL_CORNER_RADIUS)
                 add_panel.grid(
                     row=0,
                     column=0,
                     columnspan=1 if both_panels else 2,
-                    padx=(0, 10) if both_panels else 0,
+                    padx=(0, PANEL_GAP) if both_panels else 0,
                     sticky="new",
                 )
                 add_panel.grid_columnconfigure(1, weight=1)
 
-                row = 0
+                build_group_header(add_panel, "New key")
 
-                marketplace_label = ctk.CTkLabel(add_panel, text="Marketplace:")
-                marketplace_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+                row = 1
+
+                marketplace_label = ctk.CTkLabel(add_panel, text="Marketplace:", width=LABEL_WIDTH, anchor="w")
+                marketplace_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
                 self.keys_marketplace_option = ctk.CTkOptionMenu(
                     add_panel,
                     values=[Marketplace.WB.value, Marketplace.OZON.value],
                     command=lambda _choice: self._build_keys_credential_fields(),
+                    width=ENTRY_WIDTH,
                 )
                 self.keys_marketplace_option.set(Marketplace.WB.value)
-                self.keys_marketplace_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+                self.keys_marketplace_option.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
                 row += 1
 
                 self.keys_fields_frame = ctk.CTkFrame(add_panel, fg_color="transparent")
                 self.keys_fields_frame.grid(row=row, column=0, columnspan=2, sticky="w")
                 row += 1
 
-                name_label = ctk.CTkLabel(add_panel, text="Name:")
-                name_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+                name_label = ctk.CTkLabel(add_panel, text="Name:", width=LABEL_WIDTH, anchor="w")
+                name_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-                self.keys_name_entry = ctk.CTkEntry(add_panel, width=240)
-                self.keys_name_entry.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+                self.keys_name_entry = ctk.CTkEntry(add_panel, width=ENTRY_WIDTH)
+                self.keys_name_entry.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
                 row += 1
 
                 save_button = ctk.CTkButton(
@@ -121,32 +135,34 @@ class KeysSectionMixin:
                     height=40,
                     command=self._save_key_from_gui,
                 )
-                save_button.grid(row=row, column=0, padx=20, pady=(10, 20), sticky="w")
+                save_button.grid(row=row, column=0, padx=FIELD_PADX, pady=(10, 20), sticky="w")
                 row += 1
 
                 self._build_keys_credential_fields()
 
             if has_check_panel:
-                check_panel = ctk.CTkFrame(top_row, corner_radius=12)
+                check_panel = ctk.CTkFrame(top_row, corner_radius=PANEL_CORNER_RADIUS)
                 check_panel.grid(
                     row=0,
                     column=1 if both_panels else 0,
                     columnspan=1 if both_panels else 2,
-                    padx=(10, 0) if both_panels else 0,
+                    padx=(PANEL_GAP, 0) if both_panels else 0,
                     sticky="new",
                 )
                 check_panel.grid_columnconfigure(1, weight=1)
 
-                row = 0
+                build_group_header(check_panel, "Check / copy key")
+
+                row = 1
 
                 # Одно поле имени на оба действия (Check и Copy), не два
                 # рядом с одинаковым значением — выбор строки чекбоксом
                 # в таблице ниже подставляет имя сюда один раз.
-                name_label = ctk.CTkLabel(check_panel, text="Key name:")
-                name_label.grid(row=row, column=0, padx=20, pady=(15, 5), sticky="w")
+                name_label = ctk.CTkLabel(check_panel, text="Key name:", width=LABEL_WIDTH, anchor="w")
+                name_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-                self.keys_selected_name_entry = ctk.CTkEntry(check_panel, width=240)
-                self.keys_selected_name_entry.grid(row=row, column=1, padx=20, pady=(15, 5), sticky="w")
+                self.keys_selected_name_entry = ctk.CTkEntry(check_panel, width=ENTRY_WIDTH)
+                self.keys_selected_name_entry.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
                 row += 1
 
                 if can_check:
@@ -156,7 +172,7 @@ class KeysSectionMixin:
                         height=32,
                         command=self._check_key_from_gui,
                     )
-                    check_button.grid(row=row, column=0, padx=20, pady=(0, 15), sticky="w")
+                    check_button.grid(row=row, column=0, padx=FIELD_PADX, pady=(0, 15), sticky="w")
 
                 if can_copy:
                     copy_button = ctk.CTkButton(
@@ -169,26 +185,26 @@ class KeysSectionMixin:
                         row=row,
                         column=1 if can_check else 0,
                         columnspan=1 if can_check else 2,
-                        padx=20,
+                        padx=FIELD_PADX,
                         pady=(0, 15),
                         sticky="w",
                     )
                 row += 1
 
-            next_row = 3
+            next_row = 2
 
         self.keys_message_label = ctk.CTkLabel(
             content, text="", font=ctk.CTkFont(size=13), justify="left"
         )
         self.keys_message_label.grid(
-            row=next_row, column=0, padx=30, pady=(0, 10), sticky="w"
+            row=next_row, column=0, padx=CONTENT_PADX, pady=(0, 10), sticky="w"
         )
         next_row += 1
 
         content.grid_rowconfigure(next_row, weight=1)
 
-        list_frame = ctk.CTkFrame(content, corner_radius=12)
-        list_frame.grid(row=next_row, column=0, padx=30, pady=(10, 30), sticky="nsew")
+        list_frame = ctk.CTkFrame(content, corner_radius=PANEL_CORNER_RADIUS)
+        list_frame.grid(row=next_row, column=0, padx=CONTENT_PADX, pady=(10, 30), sticky="nsew")
         list_frame.grid_columnconfigure(0, weight=1)
         list_frame.grid_rowconfigure(1, weight=1)
 
@@ -218,7 +234,7 @@ class KeysSectionMixin:
         # руками (актуально с учётом отдельной проблемы кириллицы в полях
         # ввода на Windows).
         self.keys_table_frame = ctk.CTkScrollableFrame(
-            list_frame, fg_color="transparent", height=260
+            list_frame, fg_color="transparent"
         )
         self.keys_table_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
 
@@ -245,25 +261,26 @@ class KeysSectionMixin:
         marketplace = self.keys_marketplace_option.get()
 
         if marketplace == Marketplace.WB.value:
-            token_label = ctk.CTkLabel(self.keys_fields_frame, text="WB Token (JWT):")
-            token_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+            token_label = ctk.CTkLabel(self.keys_fields_frame, text="WB Token (JWT):", width=LABEL_WIDTH, anchor="w")
+            token_label.grid(row=0, column=0, padx=FIELD_PADX, pady=10, sticky="w")
 
-            token_entry = ctk.CTkEntry(self.keys_fields_frame, width=380, show="*")
-            token_entry.grid(row=0, column=1, padx=20, pady=10, sticky="w")
+            token_entry = ctk.CTkEntry(self.keys_fields_frame, width=ENTRY_WIDTH_WIDE, show="*")
+            token_entry.grid(row=0, column=1, padx=FIELD_PADX, pady=10, sticky="w")
             self.keys_field_entries["token"] = token_entry
             return
 
         # OZON: два независимых типа credentials на одного продавца.
-        kind_label = ctk.CTkLabel(self.keys_fields_frame, text="Key type:")
-        kind_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
+        kind_label = ctk.CTkLabel(self.keys_fields_frame, text="Key type:", width=LABEL_WIDTH, anchor="w")
+        kind_label.grid(row=0, column=0, padx=FIELD_PADX, pady=10, sticky="w")
 
         self.keys_kind_option = ctk.CTkOptionMenu(
             self.keys_fields_frame,
             values=[KeyKind.SELLER.value, KeyKind.PERFORMANCE.value],
             command=lambda _choice: self._build_ozon_credential_entries(),
+            width=ENTRY_WIDTH,
         )
         self.keys_kind_option.set(KeyKind.SELLER.value)
-        self.keys_kind_option.grid(row=0, column=1, padx=20, pady=10, sticky="w")
+        self.keys_kind_option.grid(row=0, column=1, padx=FIELD_PADX, pady=10, sticky="w")
 
         self.keys_ozon_entries_frame = ctk.CTkFrame(self.keys_fields_frame, fg_color="transparent")
         self.keys_ozon_entries_frame.grid(row=1, column=0, columnspan=2, sticky="w")
@@ -298,16 +315,16 @@ class KeysSectionMixin:
             id_label_text, secret_label_text = "Client ID:", "Client Secret:"
             id_field, secret_field = "client_id", "client_secret"
 
-        id_label = ctk.CTkLabel(self.keys_ozon_entries_frame, text=id_label_text)
-        id_label.grid(row=0, column=0, padx=20, pady=10, sticky="w")
-        id_entry = ctk.CTkEntry(self.keys_ozon_entries_frame, width=240)
-        id_entry.grid(row=0, column=1, padx=20, pady=10, sticky="w")
+        id_label = ctk.CTkLabel(self.keys_ozon_entries_frame, text=id_label_text, width=LABEL_WIDTH, anchor="w")
+        id_label.grid(row=0, column=0, padx=FIELD_PADX, pady=10, sticky="w")
+        id_entry = ctk.CTkEntry(self.keys_ozon_entries_frame, width=ENTRY_WIDTH)
+        id_entry.grid(row=0, column=1, padx=FIELD_PADX, pady=10, sticky="w")
         self.keys_field_entries[id_field] = id_entry
 
-        secret_label = ctk.CTkLabel(self.keys_ozon_entries_frame, text=secret_label_text)
-        secret_label.grid(row=1, column=0, padx=20, pady=10, sticky="w")
-        secret_entry = ctk.CTkEntry(self.keys_ozon_entries_frame, width=240, show="*")
-        secret_entry.grid(row=1, column=1, padx=20, pady=10, sticky="w")
+        secret_label = ctk.CTkLabel(self.keys_ozon_entries_frame, text=secret_label_text, width=LABEL_WIDTH, anchor="w")
+        secret_label.grid(row=1, column=0, padx=FIELD_PADX, pady=10, sticky="w")
+        secret_entry = ctk.CTkEntry(self.keys_ozon_entries_frame, width=ENTRY_WIDTH, show="*")
+        secret_entry.grid(row=1, column=1, padx=FIELD_PADX, pady=10, sticky="w")
         self.keys_field_entries[secret_field] = secret_entry
 
     def _collect_wb_secret(self) -> tuple[str, str]:

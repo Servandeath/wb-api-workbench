@@ -1,5 +1,15 @@
 import customtkinter as ctk
 
+from app.gui.layout import (
+    CONTENT_PADX,
+    ENTRY_WIDTH,
+    FIELD_PADX,
+    FIELD_PADY,
+    LABEL_WIDTH,
+    PANEL_CORNER_RADIUS,
+    PANEL_GAP,
+    build_group_header,
+)
 from app.config import USERS_FILE
 from app.core.permissions import has_permission
 from app.core.settings import UserRole
@@ -25,65 +35,53 @@ class UsersSectionMixin:
             return
 
         content = self._create_content_frame()
+        # _create_content_frame даёт weight=1 строке 2 по умолчанию (это
+        # для _show_default_section) — тут стрейчится другая строка (3,
+        # список), поэтому сбрасываем дефолт, иначе message_label тоже
+        # получит лишнее место и подвинет список вниз.
+        content.grid_rowconfigure(2, weight=0)
 
-        # Быстрая добивка бэклога: form + список раньше клали прямо в content
-        # без скролла, и в небольшом окне низ (форма высокая сама по себе)
-        # выталкивал список за пределы окна без возможности прокрутки.
-        # Пробовали закрепить форму и скроллить только список — не сработало:
-        # если самой форме не хватает места, списку достаётся 0px и он вообще
-        # пропадает. Поэтому скроллим всю секцию одним контейнером — тогда
-        # ничего не может схлопнуться до нуля, в крайнем случае просто больше
-        # скроллить. В большом окне снизу будет немного пустого места — это
-        # ожидаемо для короткого списка, не баг.
-        content.grid_rowconfigure(0, weight=1)
-
-        scroll = ctk.CTkScrollableFrame(content, corner_radius=0, fg_color="transparent")
-        scroll.grid(row=0, column=0, sticky="nsew")
-        scroll.grid_columnconfigure(0, weight=1)
-
-        title = ctk.CTkLabel(
-            scroll,
-            text="Users",
-            font=ctk.CTkFont(size=28, weight="bold"),
-        )
-        title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
-
+        # Заголовок раздела уже есть в topbar — второй раз тем же текстом
+        # его здесь не повторяем, только описание.
         description = ctk.CTkLabel(
-            scroll,
+            content,
             text="Create and review manager accounts. Changes are saved to disk and persist between restarts.",
             font=ctk.CTkFont(size=16),
             justify="left",
         )
-        description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
+        description.grid(row=0, column=0, padx=CONTENT_PADX, pady=(30, 10), sticky="w")
 
         # Раньше это была одна узкая колонка (Create + Manage друг под
         # другом) на всю ширину окна — тот же перекос, что чинили в
         # Keys/API Tester. Create user и Manage existing user — два
         # независимых действия, кладём их рядом по колонке на каждый.
-        top_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        top_row.grid(row=2, column=0, padx=30, pady=20, sticky="new")
+        top_row = ctk.CTkFrame(content, fg_color="transparent")
+        top_row.grid(row=1, column=0, padx=CONTENT_PADX, pady=(10, 10), sticky="new")
         top_row.grid_columnconfigure(0, weight=1)
         top_row.grid_columnconfigure(1, weight=1)
 
-        create_panel = ctk.CTkFrame(top_row, corner_radius=12)
-        create_panel.grid(row=0, column=0, padx=(0, 10), sticky="new")
+        create_panel = ctk.CTkFrame(top_row, corner_radius=PANEL_CORNER_RADIUS)
+        create_panel.grid(row=0, column=0, padx=(0, PANEL_GAP), sticky="new")
         create_panel.grid_columnconfigure(1, weight=1)
 
-        username_label = ctk.CTkLabel(create_panel, text="Username:")
-        username_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+        build_group_header(create_panel, "New user")
 
-        self.new_username_entry = ctk.CTkEntry(create_panel, width=240)
-        self.new_username_entry.grid(row=0, column=1, padx=20, pady=15, sticky="w")
+        username_label = ctk.CTkLabel(create_panel, text="Username:", width=LABEL_WIDTH, anchor="w")
+        username_label.grid(row=1, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-        role_label = ctk.CTkLabel(create_panel, text="Role:")
-        role_label.grid(row=1, column=0, padx=20, pady=15, sticky="w")
+        self.new_username_entry = ctk.CTkEntry(create_panel, width=ENTRY_WIDTH)
+        self.new_username_entry.grid(row=1, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
+
+        role_label = ctk.CTkLabel(create_panel, text="Role:", width=LABEL_WIDTH, anchor="w")
+        role_label.grid(row=2, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         self.new_user_role_option = ctk.CTkOptionMenu(
             create_panel,
             values=[role.value for role in UserRole],
+            width=ENTRY_WIDTH,
         )
         self.new_user_role_option.set(UserRole.TESTER.value)
-        self.new_user_role_option.grid(row=1, column=1, padx=20, pady=15, sticky="w")
+        self.new_user_role_option.grid(row=2, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         create_button = ctk.CTkButton(
             create_panel,
@@ -92,40 +90,38 @@ class UsersSectionMixin:
             command=self._create_user_from_gui,
         )
         create_button.grid(
-            row=2,
+            row=3,
             column=0,
             columnspan=2,
-            padx=20,
+            padx=FIELD_PADX,
             pady=(10, 20),
             sticky="w",
         )
 
-        manage_panel = ctk.CTkFrame(top_row, corner_radius=12)
-        manage_panel.grid(row=0, column=1, padx=(10, 0), sticky="new")
+        manage_panel = ctk.CTkFrame(top_row, corner_radius=PANEL_CORNER_RADIUS)
+        manage_panel.grid(row=0, column=1, padx=(PANEL_GAP, 0), sticky="new")
         manage_panel.grid_columnconfigure(1, weight=1)
 
-        manage_label = ctk.CTkLabel(
-            manage_panel,
-            text="Manage existing user:",
-            font=ctk.CTkFont(size=14, weight="bold"),
+        build_group_header(manage_panel, "Manage user")
+
+        manage_username_label = ctk.CTkLabel(
+            manage_panel, text="Target username:", width=LABEL_WIDTH, anchor="w"
         )
-        manage_label.grid(row=0, column=0, columnspan=2, padx=20, pady=(15, 5), sticky="w")
+        manage_username_label.grid(row=1, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-        manage_username_label = ctk.CTkLabel(manage_panel, text="Target username:")
-        manage_username_label.grid(row=1, column=0, padx=20, pady=15, sticky="w")
+        self.manage_username_entry = ctk.CTkEntry(manage_panel, width=ENTRY_WIDTH)
+        self.manage_username_entry.grid(row=1, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-        self.manage_username_entry = ctk.CTkEntry(manage_panel, width=240)
-        self.manage_username_entry.grid(row=1, column=1, padx=20, pady=15, sticky="w")
-
-        manage_role_label = ctk.CTkLabel(manage_panel, text="New role:")
-        manage_role_label.grid(row=2, column=0, padx=20, pady=15, sticky="w")
+        manage_role_label = ctk.CTkLabel(manage_panel, text="New role:", width=LABEL_WIDTH, anchor="w")
+        manage_role_label.grid(row=2, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         self.manage_role_option = ctk.CTkOptionMenu(
             manage_panel,
             values=[role.value for role in UserRole],
+            width=ENTRY_WIDTH,
         )
         self.manage_role_option.set(UserRole.TESTER.value)
-        self.manage_role_option.grid(row=2, column=1, padx=20, pady=15, sticky="w")
+        self.manage_role_option.grid(row=2, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         change_role_button = ctk.CTkButton(
             manage_panel,
@@ -133,7 +129,7 @@ class UsersSectionMixin:
             height=40,
             command=self._change_role_from_gui,
         )
-        change_role_button.grid(row=3, column=0, padx=20, pady=(10, 20), sticky="w")
+        change_role_button.grid(row=3, column=0, padx=FIELD_PADX, pady=(10, 20), sticky="w")
 
         deactivate_button = ctk.CTkButton(
             manage_panel,
@@ -143,7 +139,7 @@ class UsersSectionMixin:
             hover_color="#6E2E2E",
             command=self._deactivate_user_from_gui,
         )
-        deactivate_button.grid(row=3, column=1, padx=20, pady=(10, 20), sticky="w")
+        deactivate_button.grid(row=3, column=1, padx=FIELD_PADX, pady=(10, 20), sticky="w")
 
         activate_button = ctk.CTkButton(
             manage_panel,
@@ -153,28 +149,34 @@ class UsersSectionMixin:
             hover_color="#245933",
             command=self._activate_user_from_gui,
         )
-        activate_button.grid(row=4, column=0, padx=20, pady=(0, 20), sticky="w")
+        activate_button.grid(row=4, column=0, padx=FIELD_PADX, pady=(0, 20), sticky="w")
 
         self.users_message_label = ctk.CTkLabel(
-            scroll,
+            content,
             text="Only Admin can create users.",
             font=ctk.CTkFont(size=13),
             justify="left",
         )
-        self.users_message_label.grid(row=3, column=0, padx=30, pady=(0, 10), sticky="w")
+        self.users_message_label.grid(row=2, column=0, padx=CONTENT_PADX, pady=(0, 10), sticky="w")
+
+        # Список растягивается на весь остаток высоты окна вместо
+        # фиксированных 200px — раньше половина окна ниже списка просто
+        # пустовала. content.grid_rowconfigure(weight=1) отдаёт этому ряду
+        # всё свободное место; sticky="nsew" заставляет textbox его занять.
+        # Панели формы выше не резиновые (sticky="new"), поэтому даже при
+        # маленьком окне у списка не может остаться 0px — тот сценарий,
+        # из-за которого раньше выбрали скролл всей секции целиком.
+        content.grid_rowconfigure(3, weight=1)
 
         # CTkTextbox, а не CTkLabel: из лейбла нельзя выделить и
         # скопировать текст, а с кириллицей в полях ввода (см. отдельную
         # проблему раскладки на Windows) копипаст из списка — единственный
         # надёжный способ подставить имя в "Target username" без опечаток.
-        # Фиксированная высота, без своего CTkScrollableFrame — это тот же
-        # общий скролл секции, что и у формы выше, ничего не вложено.
         self.users_output = ctk.CTkTextbox(
-            scroll,
-            height=200,
+            content,
             font=ctk.CTkFont(family="Courier", size=13),
         )
-        self.users_output.grid(row=4, column=0, padx=30, pady=(0, 30), sticky="ew")
+        self.users_output.grid(row=3, column=0, padx=CONTENT_PADX, pady=(0, 30), sticky="nsew")
 
         self._refresh_users_list()
 

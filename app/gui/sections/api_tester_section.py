@@ -4,6 +4,17 @@ import json
 import customtkinter as ctk
 import httpx
 
+from app.gui.layout import (
+    CONTENT_PADX,
+    ENTRY_WIDTH,
+    ENTRY_WIDTH_WIDE,
+    FIELD_PADX,
+    FIELD_PADY,
+    LABEL_WIDTH,
+    PANEL_CORNER_RADIUS,
+    PANEL_GAP,
+    build_group_header,
+)
 from app.core.api_tester import parse_json_body, send_wb_request
 from app.core.marketplace import Marketplace
 from app.core.wb_token import get_scope_hosts
@@ -20,44 +31,38 @@ class ApiTesterSectionMixin:
         current_mode = AppMode(self.current_mode)
 
         content = self._create_content_frame()
-        content.grid_rowconfigure(0, weight=1)
+        # _create_content_frame даёт weight=1 строке 2 по умолчанию (это
+        # для _show_default_section) — тут стрейчится другая строка (4,
+        # Response), поэтому сбрасываем дефолт явно.
+        content.grid_rowconfigure(1, weight=0)
+        content.grid_rowconfigure(2, weight=0)
 
-        # Форма может быть длиннее окна (метод/путь/тело/ключ/кнопки) —
-        # тот же паттерн, что и в Users: скроллим всю секцию одним
-        # контейнером, ничего не закреплено отдельно.
-        scroll = ctk.CTkScrollableFrame(content, corner_radius=0, fg_color="transparent")
-        scroll.grid(row=0, column=0, sticky="nsew")
-        scroll.grid_columnconfigure(0, weight=1)
-
-        title = ctk.CTkLabel(
-            scroll,
-            text="API Tester",
-            font=ctk.CTkFont(size=28, weight="bold"),
-        )
-        title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
-
+        # Заголовок раздела уже есть в topbar — второй раз тем же текстом
+        # его здесь не повторяем, только описание.
         description = ctk.CTkLabel(
-            scroll,
+            content,
             text=f"Test Wildberries API methods here. Current mode: {current_mode.value}.",
             font=ctk.CTkFont(size=16),
             justify="left",
         )
-        description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
+        description.grid(row=0, column=0, padx=CONTENT_PADX, pady=(30, 10), sticky="w")
 
         # Раньше это была одна узкая колонка на всю ширину окна — слева
         # поля, справа пусто. Делим на два блока: слева — что за запрос
         # (Section/Method/Path/JSON body), справа — откуда ключ и кнопки
         # отправки. Так используется вся ширина, а не половина.
-        top_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        top_row.grid(row=2, column=0, padx=30, pady=20, sticky="new")
+        top_row = ctk.CTkFrame(content, fg_color="transparent")
+        top_row.grid(row=1, column=0, padx=CONTENT_PADX, pady=(10, 10), sticky="new")
         top_row.grid_columnconfigure(0, weight=1)
         top_row.grid_columnconfigure(1, weight=1)
 
-        request_panel = ctk.CTkFrame(top_row, corner_radius=12)
-        request_panel.grid(row=0, column=0, padx=(0, 10), sticky="new")
+        request_panel = ctk.CTkFrame(top_row, corner_radius=PANEL_CORNER_RADIUS)
+        request_panel.grid(row=0, column=0, padx=(0, PANEL_GAP), sticky="new")
         request_panel.grid_columnconfigure(1, weight=1)
 
-        row = 0
+        build_group_header(request_panel, "Request")
+
+        row = 1
 
         # У WB нет единого домена для всех методов — каждый раздел API
         # живёт на своём хосте (те же имена и хосты, что в Keys при
@@ -65,43 +70,47 @@ class ApiTesterSectionMixin:
         # base_url запроса, поле Path — только сам путь метода внутри него.
         self._api_tester_scope_hosts = dict(get_scope_hosts())
 
-        section_label = ctk.CTkLabel(request_panel, text="Section:")
-        section_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+        section_label = ctk.CTkLabel(request_panel, text="Section:", width=LABEL_WIDTH, anchor="w")
+        section_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         self.api_tester_section_option = ctk.CTkOptionMenu(
-            request_panel, values=list(self._api_tester_scope_hosts.keys())
+            request_panel, values=list(self._api_tester_scope_hosts.keys()), width=ENTRY_WIDTH
         )
-        self.api_tester_section_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+        self.api_tester_section_option.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
         row += 1
 
-        method_label = ctk.CTkLabel(request_panel, text="Method:")
-        method_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+        method_label = ctk.CTkLabel(request_panel, text="Method:", width=LABEL_WIDTH, anchor="w")
+        method_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-        self.api_tester_method_option = ctk.CTkOptionMenu(request_panel, values=["GET", "POST"])
-        self.api_tester_method_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+        self.api_tester_method_option = ctk.CTkOptionMenu(
+            request_panel, values=["GET", "POST"], width=ENTRY_WIDTH
+        )
+        self.api_tester_method_option.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
         row += 1
 
-        path_label = ctk.CTkLabel(request_panel, text="Path:")
-        path_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+        path_label = ctk.CTkLabel(request_panel, text="Path:", width=LABEL_WIDTH, anchor="w")
+        path_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         self.api_tester_path_entry = ctk.CTkEntry(
-            request_panel, width=280, placeholder_text="/api/v1/supplier/orders"
+            request_panel, width=ENTRY_WIDTH_WIDE, placeholder_text="/api/v1/supplier/orders"
         )
-        self.api_tester_path_entry.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+        self.api_tester_path_entry.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
         row += 1
 
-        body_label = ctk.CTkLabel(request_panel, text="JSON body\n(POST only):")
-        body_label.grid(row=row, column=0, padx=20, pady=(15, 20), sticky="nw")
+        body_label = ctk.CTkLabel(request_panel, text="JSON body\n(POST only):", width=LABEL_WIDTH, anchor="w")
+        body_label.grid(row=row, column=0, padx=FIELD_PADX, pady=(FIELD_PADY, 20), sticky="nw")
 
-        self.api_tester_body_textbox = ctk.CTkTextbox(request_panel, width=280, height=100)
-        self.api_tester_body_textbox.grid(row=row, column=1, padx=20, pady=(15, 20), sticky="w")
+        self.api_tester_body_textbox = ctk.CTkTextbox(request_panel, width=ENTRY_WIDTH_WIDE, height=100)
+        self.api_tester_body_textbox.grid(row=row, column=1, padx=FIELD_PADX, pady=(FIELD_PADY, 20), sticky="w")
         row += 1
 
-        send_panel = ctk.CTkFrame(top_row, corner_radius=12)
-        send_panel.grid(row=0, column=1, padx=(10, 0), sticky="new")
+        send_panel = ctk.CTkFrame(top_row, corner_radius=PANEL_CORNER_RADIUS)
+        send_panel.grid(row=0, column=1, padx=(PANEL_GAP, 0), sticky="new")
         send_panel.grid_columnconfigure(1, weight=1)
 
-        row = 0
+        build_group_header(send_panel, "Send")
+
+        row = 1
 
         # Источник ключа зависит от режима: Test -> временный ключ
         # (session_key_storage, только в памяти), Real -> один из уже
@@ -127,25 +136,25 @@ class ApiTesterSectionMixin:
                 justify="left",
                 wraplength=280,
             )
-            note.grid(row=row, column=0, columnspan=2, padx=20, pady=(20, 15), sticky="w")
+            note.grid(row=row, column=0, columnspan=2, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
             row += 1
         elif current_mode == AppMode.TEST:
-            key_label = ctk.CTkLabel(send_panel, text="Temporary WB key:")
-            key_label.grid(row=row, column=0, padx=20, pady=(20, 15), sticky="w")
+            key_label = ctk.CTkLabel(send_panel, text="Temporary WB key:", width=LABEL_WIDTH, anchor="w")
+            key_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-            self.api_tester_temp_key_entry = ctk.CTkEntry(send_panel, width=240, show="*")
-            self.api_tester_temp_key_entry.grid(row=row, column=1, padx=20, pady=(20, 15), sticky="w")
+            self.api_tester_temp_key_entry = ctk.CTkEntry(send_panel, width=ENTRY_WIDTH, show="*")
+            self.api_tester_temp_key_entry.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
             row += 1
         else:
             wb_key_names = self._list_wb_key_names()
 
-            key_label = ctk.CTkLabel(send_panel, text="Saved WB key:")
-            key_label.grid(row=row, column=0, padx=20, pady=(20, 15), sticky="w")
+            key_label = ctk.CTkLabel(send_panel, text="Saved WB key:", width=LABEL_WIDTH, anchor="w")
+            key_label.grid(row=row, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
             self.api_tester_key_option = ctk.CTkOptionMenu(
-                send_panel, values=wb_key_names or ["No WB keys saved"]
+                send_panel, values=wb_key_names or ["No WB keys saved"], width=ENTRY_WIDTH
             )
-            self.api_tester_key_option.grid(row=row, column=1, padx=20, pady=(20, 15), sticky="w")
+            self.api_tester_key_option.grid(row=row, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
             row += 1
 
         if can_send:
@@ -155,7 +164,7 @@ class ApiTesterSectionMixin:
                 height=40,
                 command=self._send_api_request_from_gui,
             )
-            send_button.grid(row=row, column=0, padx=20, pady=(10, 20), sticky="w")
+            send_button.grid(row=row, column=0, padx=FIELD_PADX, pady=(10, 20), sticky="w")
 
             save_permission = (
                 "save_test_response" if current_mode == AppMode.TEST else "save_response"
@@ -163,24 +172,30 @@ class ApiTesterSectionMixin:
             if has_permission(current_role, save_permission):
                 self.api_tester_save_checkbox = ctk.CTkCheckBox(send_panel, text="Save response")
                 self.api_tester_save_checkbox.grid(
-                    row=row, column=1, padx=20, pady=(10, 20), sticky="w"
+                    row=row, column=1, padx=FIELD_PADX, pady=(10, 20), sticky="w"
                 )
             row += 1
 
         self.api_tester_message_label = ctk.CTkLabel(
-            scroll, text="", font=ctk.CTkFont(size=13), justify="left"
+            content, text="", font=ctk.CTkFont(size=13), justify="left"
         )
         self.api_tester_message_label.grid(
-            row=3, column=0, padx=30, pady=(0, 10), sticky="w"
+            row=2, column=0, padx=CONTENT_PADX, pady=(0, 10), sticky="w"
         )
 
         response_title = ctk.CTkLabel(
-            scroll, text="Response", font=ctk.CTkFont(size=18, weight="bold")
+            content, text="Response", font=ctk.CTkFont(size=18, weight="bold")
         )
-        response_title.grid(row=4, column=0, padx=30, pady=(10, 5), sticky="w")
+        response_title.grid(row=3, column=0, padx=CONTENT_PADX, pady=(10, 5), sticky="w")
 
-        self.api_tester_output = ctk.CTkTextbox(scroll, height=280)
-        self.api_tester_output.grid(row=5, column=0, padx=30, pady=(0, 30), sticky="ew")
+        # Растягиваем на весь остаток окна вместо фиксированных 280px —
+        # форма выше не резиновая (sticky="new"), поэтому Response не
+        # схлопнется в 0px даже в маленьком окне, а в большом не оставляет
+        # пустую полосу снизу, как было раньше с фиксированной высотой.
+        content.grid_rowconfigure(4, weight=1)
+
+        self.api_tester_output = ctk.CTkTextbox(content)
+        self.api_tester_output.grid(row=4, column=0, padx=CONTENT_PADX, pady=(0, 30), sticky="nsew")
 
     def _list_wb_key_names(self) -> list[str]:
         session = SessionLocal()

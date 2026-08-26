@@ -1,5 +1,14 @@
 import customtkinter as ctk
 
+from app.gui.layout import (
+    CONTENT_PADX,
+    ENTRY_WIDTH,
+    FIELD_PADX,
+    FIELD_PADY,
+    LABEL_WIDTH,
+    PANEL_CORNER_RADIUS,
+    build_group_header,
+)
 from app.config import SESSION_FILE
 from app.core.session_state import save_session_state
 from app.core.settings import AppMode, UserRole, apply_settings
@@ -9,44 +18,43 @@ class SettingsSectionMixin:
     def _show_settings_section(self) -> None:
         content = self._create_content_frame()
 
-        title = ctk.CTkLabel(
-            content,
-            text="Settings",
-            font=ctk.CTkFont(size=28, weight="bold"),
-        )
-        title.grid(row=0, column=0, padx=30, pady=(30, 10), sticky="w")
-
+        # Заголовок раздела уже есть в topbar — второй раз тем же текстом
+        # его здесь не повторяем.
         description = ctk.CTkLabel(
             content,
             text="Configure manager role and API mode.",
             font=ctk.CTkFont(size=16),
             justify="left",
         )
-        description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
+        description.grid(row=0, column=0, padx=CONTENT_PADX, pady=(30, 10), sticky="w")
 
-        form = ctk.CTkFrame(content, corner_radius=12)
-        form.grid(row=2, column=0, padx=30, pady=20, sticky="nw")
+        form = ctk.CTkFrame(content, corner_radius=PANEL_CORNER_RADIUS)
+        form.grid(row=1, column=0, padx=CONTENT_PADX, pady=20, sticky="nw")
         form.grid_columnconfigure(1, weight=1)
 
-        role_label = ctk.CTkLabel(form, text="Role:")
-        role_label.grid(row=0, column=0, padx=20, pady=15, sticky="w")
+        build_group_header(form, "Role & mode")
+
+        role_label = ctk.CTkLabel(form, text="Role:", width=LABEL_WIDTH, anchor="w")
+        role_label.grid(row=1, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         self.role_option = ctk.CTkOptionMenu(
             form,
             values=[role.value for role in UserRole],
+            width=ENTRY_WIDTH,
         )
         self.role_option.set(self.current_role)
-        self.role_option.grid(row=0, column=1, padx=20, pady=15, sticky="w")
+        self.role_option.grid(row=1, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
-        mode_label = ctk.CTkLabel(form, text="Mode:")
-        mode_label.grid(row=1, column=0, padx=20, pady=15, sticky="w")
+        mode_label = ctk.CTkLabel(form, text="Mode:", width=LABEL_WIDTH, anchor="w")
+        mode_label.grid(row=2, column=0, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         self.mode_option = ctk.CTkOptionMenu(
             form,
             values=[mode.value for mode in AppMode],
+            width=ENTRY_WIDTH,
         )
         self.mode_option.set(self.current_mode)
-        self.mode_option.grid(row=1, column=1, padx=20, pady=15, sticky="w")
+        self.mode_option.grid(row=2, column=1, padx=FIELD_PADX, pady=FIELD_PADY, sticky="w")
 
         apply_button = ctk.CTkButton(
             form,
@@ -55,10 +63,10 @@ class SettingsSectionMixin:
             command=self._apply_settings_from_gui,
         )
         apply_button.grid(
-            row=2,
+            row=3,
             column=0,
             columnspan=2,
-            padx=20,
+            padx=FIELD_PADX,
             pady=20,
             sticky="w",
         )
@@ -69,10 +77,10 @@ class SettingsSectionMixin:
             font=ctk.CTkFont(size=13),
         )
         self.settings_message_label.grid(
-            row=3,
+            row=4,
             column=0,
             columnspan=2,
-            padx=20,
+            padx=FIELD_PADX,
             pady=(0, 20),
             sticky="w",
         )
