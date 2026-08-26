@@ -32,3 +32,29 @@ def init_db(bind_engine=engine) -> None:
     from app.db import models  # noqa: F401
 
     Base.metadata.create_all(bind=bind_engine)
+    _add_missing_columns(bind_engine)
+
+
+def _add_missing_columns(bind_engine) -> None:
+    """
+    Мини-миграция без Alembic: create_all() создаёт только отсутствующие
+    ТАБЛИЦЫ, но не добавляет новые колонки в уже существующие (у тех, кто
+    запускал приложение раньше, api_keys.db уже на диске со старой схемой).
+    Для одного sqlite-файла проекта этого достаточно — полноценный Alembic
+    был бы избыточен.
+    """
+    with bind_engine.connect() as connection:
+        existing = {
+            row[1] for row in connection.exec_driver_sql("PRAGMA table_info(api_keys)")
+        }
+
+        if "last_check_status" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE api_keys ADD COLUMN last_check_status VARCHAR"
+            )
+        if "last_check_detail" not in existing:
+            connection.exec_driver_sql(
+                "ALTER TABLE api_keys ADD COLUMN last_check_detail TEXT"
+            )
+
+        connection.commit()

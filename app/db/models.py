@@ -20,6 +20,11 @@ class ApiKey(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Кеш последнего Check: агрегированный статус ("OK"/"401"/"MIXED"/...)
+    # и, для WB, посекционная разбивка ("Content: 200\nAnalytics: 401\n...").
+    # Живёт до следующего Check — не пересчитывается сам по себе.
+    last_check_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    last_check_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ApiRequestLog(Base):

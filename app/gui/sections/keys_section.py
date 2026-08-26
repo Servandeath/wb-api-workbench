@@ -63,19 +63,40 @@ class KeysSectionMixin:
         can_copy = has_permission(current_role, "view_full_key")
         next_row = 2
 
-        if can_add or can_check or can_copy:
-            form = ctk.CTkFrame(content, corner_radius=12)
-            form.grid(row=2, column=0, padx=30, pady=(10, 20), sticky="new")
-            form.grid_columnconfigure(1, weight=1)
+        # Add и Check/Copy — два независимых блока в один столбец каждый.
+        # Раньше все три сидели в одной узкой форме, а справа от неё
+        # пустовала половина ширины окна. Когда доступны оба блока (Admin)
+        # — кладём их рядом, по колонке на каждый. Когда доступен только
+        # один (например Tester видит лишь Check) — он один растягивается
+        # на всю ширину, а не жмётся в узкую половину рядом с пустотой.
+        has_add_panel = can_add
+        has_check_panel = can_check or can_copy
+        both_panels = has_add_panel and has_check_panel
 
-            row = 0
+        if has_add_panel or has_check_panel:
+            top_row = ctk.CTkFrame(content, fg_color="transparent")
+            top_row.grid(row=2, column=0, padx=30, pady=(10, 10), sticky="new")
+            top_row.grid_columnconfigure(0, weight=1)
+            top_row.grid_columnconfigure(1, weight=1)
 
-            if can_add:
-                marketplace_label = ctk.CTkLabel(form, text="Marketplace:")
+            if has_add_panel:
+                add_panel = ctk.CTkFrame(top_row, corner_radius=12)
+                add_panel.grid(
+                    row=0,
+                    column=0,
+                    columnspan=1 if both_panels else 2,
+                    padx=(0, 10) if both_panels else 0,
+                    sticky="new",
+                )
+                add_panel.grid_columnconfigure(1, weight=1)
+
+                row = 0
+
+                marketplace_label = ctk.CTkLabel(add_panel, text="Marketplace:")
                 marketplace_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
 
                 self.keys_marketplace_option = ctk.CTkOptionMenu(
-                    form,
+                    add_panel,
                     values=[Marketplace.WB.value, Marketplace.OZON.value],
                     command=lambda _choice: self._build_keys_credential_fields(),
                 )
@@ -83,75 +104,86 @@ class KeysSectionMixin:
                 self.keys_marketplace_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
                 row += 1
 
-                self.keys_fields_frame = ctk.CTkFrame(form, fg_color="transparent")
+                self.keys_fields_frame = ctk.CTkFrame(add_panel, fg_color="transparent")
                 self.keys_fields_frame.grid(row=row, column=0, columnspan=2, sticky="w")
                 row += 1
 
-                name_label = ctk.CTkLabel(form, text="Name:")
+                name_label = ctk.CTkLabel(add_panel, text="Name:")
                 name_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
 
-                self.keys_name_entry = ctk.CTkEntry(form, width=240)
+                self.keys_name_entry = ctk.CTkEntry(add_panel, width=240)
                 self.keys_name_entry.grid(row=row, column=1, padx=20, pady=15, sticky="w")
                 row += 1
 
                 save_button = ctk.CTkButton(
-                    form,
+                    add_panel,
                     text="Save Key",
                     height=40,
                     command=self._save_key_from_gui,
                 )
-                save_button.grid(row=row, column=0, padx=20, pady=(10, 5), sticky="w")
+                save_button.grid(row=row, column=0, padx=20, pady=(10, 20), sticky="w")
                 row += 1
 
                 self._build_keys_credential_fields()
 
-            if can_check:
-                check_label = ctk.CTkLabel(form, text="Check key by name:")
-                check_label.grid(row=row, column=0, padx=20, pady=(15, 5), sticky="w")
-
-                self.keys_check_name_entry = ctk.CTkEntry(form, width=240)
-                self.keys_check_name_entry.grid(row=row, column=1, padx=20, pady=(15, 5), sticky="w")
-                row += 1
-
-                check_button = ctk.CTkButton(
-                    form,
-                    text="Check",
-                    height=32,
-                    command=self._check_key_from_gui,
+            if has_check_panel:
+                check_panel = ctk.CTkFrame(top_row, corner_radius=12)
+                check_panel.grid(
+                    row=0,
+                    column=1 if both_panels else 0,
+                    columnspan=1 if both_panels else 2,
+                    padx=(10, 0) if both_panels else 0,
+                    sticky="new",
                 )
-                check_button.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="w")
+                check_panel.grid_columnconfigure(1, weight=1)
+
+                row = 0
+
+                # Одно поле имени на оба действия (Check и Copy), не два
+                # рядом с одинаковым значением — выбор строки чекбоксом
+                # в таблице ниже подставляет имя сюда один раз.
+                name_label = ctk.CTkLabel(check_panel, text="Key name:")
+                name_label.grid(row=row, column=0, padx=20, pady=(15, 5), sticky="w")
+
+                self.keys_selected_name_entry = ctk.CTkEntry(check_panel, width=240)
+                self.keys_selected_name_entry.grid(row=row, column=1, padx=20, pady=(15, 5), sticky="w")
                 row += 1
 
-            if can_copy:
-                copy_label = ctk.CTkLabel(form, text="Copy secret by name:")
-                copy_label.grid(row=row, column=0, padx=20, pady=(15, 5), sticky="w")
+                if can_check:
+                    check_button = ctk.CTkButton(
+                        check_panel,
+                        text="Check",
+                        height=32,
+                        command=self._check_key_from_gui,
+                    )
+                    check_button.grid(row=row, column=0, padx=20, pady=(0, 15), sticky="w")
 
-                self.keys_copy_name_entry = ctk.CTkEntry(form, width=240)
-                self.keys_copy_name_entry.grid(row=row, column=1, padx=20, pady=(15, 5), sticky="w")
+                if can_copy:
+                    copy_button = ctk.CTkButton(
+                        check_panel,
+                        text="Copy full secret to clipboard",
+                        height=32,
+                        command=self._copy_key_from_gui,
+                    )
+                    copy_button.grid(
+                        row=row,
+                        column=1 if can_check else 0,
+                        columnspan=1 if can_check else 2,
+                        padx=20,
+                        pady=(0, 15),
+                        sticky="w",
+                    )
                 row += 1
-
-                copy_button = ctk.CTkButton(
-                    form,
-                    text="Copy full secret to clipboard",
-                    height=32,
-                    command=self._copy_key_from_gui,
-                )
-                copy_button.grid(row=row, column=0, columnspan=2, padx=20, pady=(0, 10), sticky="w")
-                row += 1
-
-            self.keys_message_label = ctk.CTkLabel(
-                form, text="", font=ctk.CTkFont(size=13), justify="left"
-            )
-            self.keys_message_label.grid(
-                row=row,
-                column=0,
-                columnspan=2,
-                padx=20,
-                pady=(0, 20),
-                sticky="w",
-            )
 
             next_row = 3
+
+        self.keys_message_label = ctk.CTkLabel(
+            content, text="", font=ctk.CTkFont(size=13), justify="left"
+        )
+        self.keys_message_label.grid(
+            row=next_row, column=0, padx=30, pady=(0, 10), sticky="w"
+        )
+        next_row += 1
 
         content.grid_rowconfigure(next_row, weight=1)
 
@@ -180,8 +212,15 @@ class KeysSectionMixin:
         )
         refresh_button.grid(row=0, column=1, sticky="e", padx=(10, 0))
 
-        self.keys_output = ctk.CTkTextbox(list_frame, height=260)
-        self.keys_output.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
+        # Настоящая таблица вместо текстового блока: колонки + чекбокс на
+        # строку. Чекбокс не для массовых операций — он один раз подставляет
+        # имя ключа в поля Check/Copy выше, чтобы не перепечатывать его
+        # руками (актуально с учётом отдельной проблемы кириллицы в полях
+        # ввода на Windows).
+        self.keys_table_frame = ctk.CTkScrollableFrame(
+            list_frame, fg_color="transparent", height=260
+        )
+        self.keys_table_frame.grid(row=1, column=0, sticky="nsew", padx=20, pady=(0, 20))
 
         self._refresh_keys_list()
 
@@ -381,10 +420,10 @@ class KeysSectionMixin:
         self._refresh_keys_list()
 
     def _check_key_from_gui(self) -> None:
-        if self.keys_check_name_entry is None:
+        if self.keys_selected_name_entry is None:
             return
 
-        name = self.keys_check_name_entry.get().strip()
+        name = self.keys_selected_name_entry.get().strip()
         if not name:
             self._set_keys_message("Enter a key name to check.")
             return
@@ -424,10 +463,10 @@ class KeysSectionMixin:
         encrypted_keys.json. Секрет НИКОГДА не выводится в саму форму —
         только в буфер, только по явному запросу с правом view_full_key.
         """
-        if self.keys_copy_name_entry is None:
+        if self.keys_selected_name_entry is None:
             return
 
-        name = self.keys_copy_name_entry.get().strip()
+        name = self.keys_selected_name_entry.get().strip()
         if not name:
             self._set_keys_message("Enter a key name to copy.")
             return
@@ -481,9 +520,26 @@ class KeysSectionMixin:
         result = asyncio.run(check())
         return result["status"], None
 
+    _KEYS_TABLE_COLUMNS = ("", "Name", "Marketplace", "Kind", "Masked", "Status", "Checked at")
+
     def _refresh_keys_list(self) -> None:
-        if self.keys_output is None:
+        if self.keys_table_frame is None:
             return
+
+        for widget in self.keys_table_frame.winfo_children():
+            widget.destroy()
+
+        for col in range(len(self._KEYS_TABLE_COLUMNS)):
+            self.keys_table_frame.grid_columnconfigure(col, weight=0)
+
+        for col, heading in enumerate(self._KEYS_TABLE_COLUMNS):
+            header = ctk.CTkLabel(
+                self.keys_table_frame,
+                text=heading,
+                font=ctk.CTkFont(size=12, weight="bold"),
+                anchor="w",
+            )
+            header.grid(row=0, column=col, padx=(0, 16), pady=(0, 8), sticky="w")
 
         session = SessionLocal()
         try:
@@ -491,8 +547,18 @@ class KeysSectionMixin:
         finally:
             session.close()
 
-        lines = []
-        for index, key in enumerate(keys, start=1):
+        self.keys_row_checkboxes = {}
+
+        if not keys:
+            empty_label = ctk.CTkLabel(self.keys_table_frame, text="No keys saved yet.")
+            empty_label.grid(
+                row=1, column=0, columnspan=len(self._KEYS_TABLE_COLUMNS),
+                padx=0, pady=10, sticky="w",
+            )
+            return
+
+        grid_row = 1
+        for key in keys:
             # Кеш последнего Check (record_check_result) — не "проверяем
             # прямо сейчас", а последнее, что мы знаем. checked_at всегда
             # берём из last_used_at, т.к. это единственное поле, куда
@@ -503,16 +569,47 @@ class KeysSectionMixin:
                 if key.last_used_at
                 else "never"
             )
-            lines.append(
-                f"{index}. {key.name} | {key.marketplace} / {key.key_kind} | "
-                f"{key.masked_token} | last check: {status} ({checked_at})"
-            )
+
+            checkbox = ctk.CTkCheckBox(self.keys_table_frame, text="", width=20)
+            checkbox.configure(command=lambda name=key.name: self._select_key_row(name))
+            checkbox.grid(row=grid_row, column=0, padx=(0, 16), pady=6, sticky="w")
+            self.keys_row_checkboxes[key.name] = checkbox
+
+            values = (key.name, key.marketplace, key.key_kind, key.masked_token, status, checked_at)
+            for col, value in enumerate(values, start=1):
+                cell = ctk.CTkLabel(self.keys_table_frame, text=value, anchor="w")
+                cell.grid(row=grid_row, column=col, padx=(0, 16), pady=6, sticky="w")
+
+            grid_row += 1
+
             if key.last_check_detail:
-                for detail_line in key.last_check_detail.splitlines():
-                    lines.append(f"     {detail_line}")
+                detail_text = "  |  ".join(key.last_check_detail.splitlines())
+                detail_label = ctk.CTkLabel(
+                    self.keys_table_frame,
+                    text=detail_text,
+                    font=ctk.CTkFont(size=11),
+                    text_color="#9AA0A6",
+                    anchor="w",
+                    justify="left",
+                )
+                detail_label.grid(
+                    row=grid_row, column=1, columnspan=len(self._KEYS_TABLE_COLUMNS) - 1,
+                    padx=(0, 16), pady=(0, 6), sticky="w",
+                )
+                grid_row += 1
 
-        output = "\n".join(lines) if lines else "No keys saved yet."
+    def _select_key_row(self, name: str) -> None:
+        """
+        Один чекбокс за раз: выбор строки подставляет её имя в общее поле
+        Key name выше (одно на Check и Copy — раньше было два одинаковых
+        поля рядом, что было лишним), а не копит несколько выбранных
+        ключей сразу.
+        """
+        for row_name, checkbox in self.keys_row_checkboxes.items():
+            if row_name != name:
+                checkbox.deselect()
 
-        self.keys_output.delete("1.0", "end")
-        self.keys_output.insert("1.0", output)
+        if self.keys_selected_name_entry is not None:
+            self.keys_selected_name_entry.delete(0, "end")
+            self.keys_selected_name_entry.insert(0, name)
 

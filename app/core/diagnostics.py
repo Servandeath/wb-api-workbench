@@ -1,13 +1,17 @@
+import importlib
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import BASE_DIR, DATA_DIR, RAW_DATA_DIR, IMPORTS_DIR, CACHE_DIR, SECURE_DIR
+from app.core.encrypted_file_storage import EncryptedFileKeyStorage
 from app.core.permissions import has_permission
 from app.core.session_key_storage import SessionKeyStorage
 from app.core.settings import UserRole
 from sqlalchemy import inspect
 from app.db.database import engine, init_db
+
+REQUIRED_LIBRARIES = ["httpx", "customtkinter", "cryptography", "sqlalchemy", "keyring"]
 
 
 @dataclass
@@ -131,15 +135,72 @@ def check_database(bind_engine=engine) -> DiagnosticResult:
         message="Missing tables: " + ", ".join(sorted(missing)),
     )
 
+def check_libraries() -> DiagnosticResult:
+    missing = []
+    for name in REQUIRED_LIBRARIES:
+        try:
+            importlib.import_module(name)
+        except ImportError:
+            missing.append(name)
+
+    if not missing:
+        return DiagnosticResult(
+            name="Libraries",
+            status="OK",
+            message="All required libraries are installed",
+        )
+
+    return DiagnosticResult(
+        name="Libraries",
+        status="FAIL",
+        message="Missing libraries: " + ", ".join(missing),
+    )
+
+
+def check_encrypted_storage() -> DiagnosticResult:
+    """
+    Круговая проверка EncryptedFileKeyStorage: пишем разовый пробный
+    секрет, читаем его обратно, потом сразу удаляем — реальные сохранённые
+    ключи пользователя эта проверка не трогает.
+    """
+    storage = EncryptedFileKeyStorage()
+    probe_name = "__diagnostics_probe__"
+
+    try:
+        storage.save_token(probe_name, "diagnostics-secret")
+        token = storage.get_token(probe_name)
+    except Exception as error:
+        return DiagnosticResult(
+            name="Encrypted storage",
+            status="FAIL",
+            message=f"Cannot write/read encrypted storage: {error}",
+        )
+    finally:
+        storage.delete_token(probe_name)
+
+    if token == "diagnostics-secret":
+        return DiagnosticResult(
+            name="Encrypted storage",
+            status="OK",
+            message="Encrypted file storage round-trips correctly",
+        )
+
+    return DiagnosticResult(
+        name="Encrypted storage",
+        status="FAIL",
+        message="Encrypted file storage round-trip failed",
+    )
+
+
 def run_diagnostics() -> list[DiagnosticResult]:
     return [
         check_python_version(),
         check_project_folders(),
+        check_libraries(),
         check_permissions(),
         check_session_key_storage(),
+        check_encrypted_storage(),
         check_database(),
-        # TODO: check_libraries() — httpx, customtkinter, cryptography установлены
-        # TODO: check_encrypted_storage() — Fernet-хранилище пишет на диск
     ]
 
 

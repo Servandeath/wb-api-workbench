@@ -44,9 +44,18 @@ class ApiTesterSectionMixin:
         )
         description.grid(row=1, column=0, padx=30, pady=10, sticky="w")
 
-        form = ctk.CTkFrame(scroll, corner_radius=12)
-        form.grid(row=2, column=0, padx=30, pady=20, sticky="new")
-        form.grid_columnconfigure(1, weight=1)
+        # Раньше это была одна узкая колонка на всю ширину окна — слева
+        # поля, справа пусто. Делим на два блока: слева — что за запрос
+        # (Section/Method/Path/JSON body), справа — откуда ключ и кнопки
+        # отправки. Так используется вся ширина, а не половина.
+        top_row = ctk.CTkFrame(scroll, fg_color="transparent")
+        top_row.grid(row=2, column=0, padx=30, pady=20, sticky="new")
+        top_row.grid_columnconfigure(0, weight=1)
+        top_row.grid_columnconfigure(1, weight=1)
+
+        request_panel = ctk.CTkFrame(top_row, corner_radius=12)
+        request_panel.grid(row=0, column=0, padx=(0, 10), sticky="new")
+        request_panel.grid_columnconfigure(1, weight=1)
 
         row = 0
 
@@ -56,37 +65,43 @@ class ApiTesterSectionMixin:
         # base_url запроса, поле Path — только сам путь метода внутри него.
         self._api_tester_scope_hosts = dict(get_scope_hosts())
 
-        section_label = ctk.CTkLabel(form, text="Section:")
+        section_label = ctk.CTkLabel(request_panel, text="Section:")
         section_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
 
         self.api_tester_section_option = ctk.CTkOptionMenu(
-            form, values=list(self._api_tester_scope_hosts.keys())
+            request_panel, values=list(self._api_tester_scope_hosts.keys())
         )
         self.api_tester_section_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
         row += 1
 
-        method_label = ctk.CTkLabel(form, text="Method:")
+        method_label = ctk.CTkLabel(request_panel, text="Method:")
         method_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
 
-        self.api_tester_method_option = ctk.CTkOptionMenu(form, values=["GET", "POST"])
+        self.api_tester_method_option = ctk.CTkOptionMenu(request_panel, values=["GET", "POST"])
         self.api_tester_method_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
         row += 1
 
-        path_label = ctk.CTkLabel(form, text="Path:")
+        path_label = ctk.CTkLabel(request_panel, text="Path:")
         path_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
 
         self.api_tester_path_entry = ctk.CTkEntry(
-            form, width=360, placeholder_text="/api/v1/supplier/orders"
+            request_panel, width=280, placeholder_text="/api/v1/supplier/orders"
         )
         self.api_tester_path_entry.grid(row=row, column=1, padx=20, pady=15, sticky="w")
         row += 1
 
-        body_label = ctk.CTkLabel(form, text="JSON body\n(POST only):")
-        body_label.grid(row=row, column=0, padx=20, pady=15, sticky="nw")
+        body_label = ctk.CTkLabel(request_panel, text="JSON body\n(POST only):")
+        body_label.grid(row=row, column=0, padx=20, pady=(15, 20), sticky="nw")
 
-        self.api_tester_body_textbox = ctk.CTkTextbox(form, width=360, height=100)
-        self.api_tester_body_textbox.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+        self.api_tester_body_textbox = ctk.CTkTextbox(request_panel, width=280, height=100)
+        self.api_tester_body_textbox.grid(row=row, column=1, padx=20, pady=(15, 20), sticky="w")
         row += 1
+
+        send_panel = ctk.CTkFrame(top_row, corner_radius=12)
+        send_panel.grid(row=0, column=1, padx=(10, 0), sticky="new")
+        send_panel.grid_columnconfigure(1, weight=1)
+
+        row = 0
 
         # Источник ключа зависит от режима: Test -> временный ключ
         # (session_key_storage, только в памяти), Real -> один из уже
@@ -103,65 +118,69 @@ class ApiTesterSectionMixin:
 
         if not can_send:
             note = ctk.CTkLabel(
-                form,
+                send_panel,
                 text=(
                     f"Role {current_role.value} cannot send requests in "
                     f"{current_mode.value} mode."
                 ),
                 font=ctk.CTkFont(size=13),
+                justify="left",
+                wraplength=280,
             )
-            note.grid(row=row, column=0, columnspan=2, padx=20, pady=(5, 15), sticky="w")
+            note.grid(row=row, column=0, columnspan=2, padx=20, pady=(20, 15), sticky="w")
             row += 1
         elif current_mode == AppMode.TEST:
-            key_label = ctk.CTkLabel(form, text="Temporary WB key:")
-            key_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+            key_label = ctk.CTkLabel(send_panel, text="Temporary WB key:")
+            key_label.grid(row=row, column=0, padx=20, pady=(20, 15), sticky="w")
 
-            self.api_tester_temp_key_entry = ctk.CTkEntry(form, width=360, show="*")
-            self.api_tester_temp_key_entry.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+            self.api_tester_temp_key_entry = ctk.CTkEntry(send_panel, width=240, show="*")
+            self.api_tester_temp_key_entry.grid(row=row, column=1, padx=20, pady=(20, 15), sticky="w")
             row += 1
         else:
             wb_key_names = self._list_wb_key_names()
 
-            key_label = ctk.CTkLabel(form, text="Saved WB key:")
-            key_label.grid(row=row, column=0, padx=20, pady=15, sticky="w")
+            key_label = ctk.CTkLabel(send_panel, text="Saved WB key:")
+            key_label.grid(row=row, column=0, padx=20, pady=(20, 15), sticky="w")
 
             self.api_tester_key_option = ctk.CTkOptionMenu(
-                form, values=wb_key_names or ["No WB keys saved"]
+                send_panel, values=wb_key_names or ["No WB keys saved"]
             )
-            self.api_tester_key_option.grid(row=row, column=1, padx=20, pady=15, sticky="w")
+            self.api_tester_key_option.grid(row=row, column=1, padx=20, pady=(20, 15), sticky="w")
             row += 1
 
         if can_send:
             send_button = ctk.CTkButton(
-                form,
+                send_panel,
                 text="Send",
                 height=40,
                 command=self._send_api_request_from_gui,
             )
-            send_button.grid(row=row, column=0, padx=20, pady=(10, 5), sticky="w")
+            send_button.grid(row=row, column=0, padx=20, pady=(10, 20), sticky="w")
 
             save_permission = (
                 "save_test_response" if current_mode == AppMode.TEST else "save_response"
             )
             if has_permission(current_role, save_permission):
-                self.api_tester_save_checkbox = ctk.CTkCheckBox(form, text="Save response")
+                self.api_tester_save_checkbox = ctk.CTkCheckBox(send_panel, text="Save response")
                 self.api_tester_save_checkbox.grid(
-                    row=row, column=1, padx=20, pady=(10, 5), sticky="w"
+                    row=row, column=1, padx=20, pady=(10, 20), sticky="w"
                 )
             row += 1
 
-        self.api_tester_message_label = ctk.CTkLabel(form, text="", font=ctk.CTkFont(size=13))
+        self.api_tester_message_label = ctk.CTkLabel(
+            scroll, text="", font=ctk.CTkFont(size=13), justify="left"
+        )
         self.api_tester_message_label.grid(
-            row=row, column=0, columnspan=2, padx=20, pady=(0, 20), sticky="w"
+            row=3, column=0, padx=30, pady=(0, 10), sticky="w"
         )
 
         response_title = ctk.CTkLabel(
             scroll, text="Response", font=ctk.CTkFont(size=18, weight="bold")
         )
-        response_title.grid(row=3, column=0, padx=30, pady=(10, 5), sticky="w")
+        response_title.grid(row=4, column=0, padx=30, pady=(10, 5), sticky="w")
 
         self.api_tester_output = ctk.CTkTextbox(scroll, height=280)
-        self.api_tester_output.grid(row=4, column=0, padx=30, pady=(0, 30), sticky="ew")
+        self.api_tester_output.grid(row=5, column=0, padx=30, pady=(0, 30), sticky="ew")
 
     def _list_wb_key_names(self) -> list[str]:
         session = SessionLocal()

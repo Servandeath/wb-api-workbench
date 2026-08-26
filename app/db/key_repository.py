@@ -73,6 +73,31 @@ def deactivate_api_key(session: Session, name: str) -> ApiKey | None:
     return api_key
 
 
+def record_check_result(
+    session: Session, name: str, status: str, detail: str | None = None
+) -> ApiKey | None:
+    """
+    Сохранить результат Check (Keys) как единую операцию.
+
+    Раньше это были три отдельных вызова из GUI (activate/deactivate_api_key
+    + touch_api_key_last_used) — здесь то же самое плюс кеш посекционной
+    разбивки (last_check_status/last_check_detail), которая раньше нигде
+    не сохранялась и пропадала сразу после отображения в GUI.
+    """
+    api_key = get_api_key_by_name(session, name)
+    if api_key is None:
+        return None
+
+    api_key.is_active = status == "OK"
+    api_key.last_check_status = status
+    api_key.last_check_detail = detail
+    api_key.last_used_at = utcnow()
+    session.commit()
+    session.refresh(api_key)
+
+    return api_key
+
+
 def delete_api_key(session: Session, name: str) -> bool:
     api_key = get_api_key_by_name(session, name)
     if api_key is None:

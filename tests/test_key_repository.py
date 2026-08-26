@@ -11,6 +11,7 @@ from app.db.key_repository import (
     delete_api_key,
     get_api_key_by_name,
     list_api_keys,
+    record_check_result,
     touch_api_key_last_used,
 )
 
@@ -137,3 +138,36 @@ def test_delete_api_key(session):
 
 def test_delete_api_key_missing_returns_false(session):
     assert delete_api_key(session, "missing") is False
+
+
+def test_record_check_result_ok_activates_and_stores_status(session):
+    _add_wb_key(session)
+
+    updated = record_check_result(session, "a", "OK", "Content: 200\nAnalytics: 200")
+
+    assert updated.is_active is True
+    assert updated.last_check_status == "OK"
+    assert updated.last_check_detail == "Content: 200\nAnalytics: 200"
+    assert updated.last_used_at is not None
+
+
+def test_record_check_result_non_ok_deactivates(session):
+    _add_wb_key(session)
+    record_check_result(session, "a", "OK")
+
+    updated = record_check_result(session, "a", "MIXED", "Content: 200\nAnalytics: 401")
+
+    assert updated.is_active is False
+    assert updated.last_check_status == "MIXED"
+
+
+def test_record_check_result_without_detail(session):
+    _add_wb_key(session)
+
+    updated = record_check_result(session, "a", "OK")
+
+    assert updated.last_check_detail is None
+
+
+def test_record_check_result_missing_returns_none(session):
+    assert record_check_result(session, "missing", "OK") is None

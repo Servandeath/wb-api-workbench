@@ -67,9 +67,9 @@ class MainWindow(
         self.keys_field_entries: dict[str, ctk.CTkEntry] = {}
         self.keys_name_entry: ctk.CTkEntry | None = None
         self.keys_message_label: ctk.CTkLabel | None = None
-        self.keys_check_name_entry: ctk.CTkEntry | None = None
-        self.keys_copy_name_entry: ctk.CTkEntry | None = None
-        self.keys_output: ctk.CTkTextbox | None = None
+        self.keys_selected_name_entry: ctk.CTkEntry | None = None
+        self.keys_table_frame: ctk.CTkScrollableFrame | None = None
+        self.keys_row_checkboxes: dict[str, ctk.CTkCheckBox] = {}
 
         self.api_tester_section_option: ctk.CTkOptionMenu | None = None
         self.api_tester_method_option: ctk.CTkOptionMenu | None = None
