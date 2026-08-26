@@ -4,7 +4,13 @@ from app.config import USERS_FILE
 from app.core.permissions import has_permission
 from app.core.settings import UserRole
 from app.core.user_store import save_users
-from app.core.users import add_user, change_user_role, deactivate_user, find_user
+from app.core.users import (
+    activate_user,
+    add_user,
+    change_user_role,
+    deactivate_user,
+    find_user,
+)
 
 
 class UsersSectionMixin:
@@ -140,6 +146,16 @@ class UsersSectionMixin:
         )
         deactivate_button.grid(row=7, column=1, padx=20, pady=(10, 20), sticky="w")
 
+        activate_button = ctk.CTkButton(
+            form,
+            text="Activate",
+            height=40,
+            fg_color="#2E6E3E",
+            hover_color="#245933",
+            command=self._activate_user_from_gui,
+        )
+        activate_button.grid(row=8, column=0, padx=20, pady=(0, 20), sticky="w")
+
         # Список — обычный CTkLabel в том же скролле, что и форма выше
         # (не отдельный CTkScrollableFrame и не CTkTextbox: один общий скролл
         # на всю секцию, без вложенных/конкурирующих скроллов).
@@ -218,6 +234,26 @@ class UsersSectionMixin:
 
         if self.users_message_label is not None:
             self.users_message_label.configure(text=f"User deactivated: {user.username}")
+
+        self._refresh_users_list()
+
+    def _activate_user_from_gui(self) -> None:
+        if self.manage_username_entry is None:
+            return
+
+        username = self.manage_username_entry.get()
+
+        user = find_user(self.user_accounts, username)
+        if user is None:
+            if self.users_message_label is not None:
+                self.users_message_label.configure(text=f"User not found: {username}")
+            return
+
+        activate_user(user)
+        save_users(USERS_FILE, self.user_accounts)
+
+        if self.users_message_label is not None:
+            self.users_message_label.configure(text=f"User activated: {user.username}")
 
         self._refresh_users_list()
 

@@ -13,12 +13,10 @@ from app.core.token_utils import mask_ozon_credentials
 from app.core.wb_token import token_info
 from app.db.database import SessionLocal
 from app.db.key_repository import (
-    activate_api_key,
     add_api_key,
-    deactivate_api_key,
     get_api_key_by_name,
     list_api_keys,
-    touch_api_key_last_used,
+    record_check_result,
 )
 
 
@@ -58,9 +56,14 @@ class KeysSectionMixin:
         # (check_key_liveness). Раньше обе кнопки сидели за одним add_key.
         can_add = has_permission(current_role, "add_key")
         can_check = has_permission(current_role, "check_key_liveness")
+        # Полный (расшифрованный) секрет нужен, когда тот же ключ заводят
+        # ещё и в другом инструменте/проекте — раньше единственный способ
+        # был руками читать encrypted_keys.json. view_full_key был заведён
+        # в правах заранее, но нигде не использовался — вот его применение.
+        can_copy = has_permission(current_role, "view_full_key")
         next_row = 2
 
-        if can_add or can_check:
+        if can_add or can_check or can_copy:
             form = ctk.CTkFrame(content, corner_radius=12)
             form.grid(row=2, column=0, padx=30, pady=(10, 20), sticky="new")
             form.grid_columnconfigure(1, weight=1)
@@ -117,6 +120,23 @@ class KeysSectionMixin:
                     command=self._check_key_from_gui,
                 )
                 check_button.grid(row=row, column=0, padx=20, pady=(0, 10), sticky="w")
+                row += 1
+
+            if can_copy:
+                copy_label = ctk.CTkLabel(form, text="Copy secret by name:")
+                copy_label.grid(row=row, column=0, padx=20, pady=(15, 5), sticky="w")
+
+                self.keys_copy_name_entry = ctk.CTkEntry(form, width=240)
+                self.keys_copy_name_entry.grid(row=row, column=1, padx=20, pady=(15, 5), sticky="w")
+                row += 1
+
+                copy_button = ctk.CTkButton(
+                    form,
+                    text="Copy full secret to clipboard",
+                    height=32,
+                    command=self._copy_key_from_gui,
+                )
+                copy_button.grid(row=row, column=0, columnspan=2, padx=20, pady=(0, 10), sticky="w")
                 row += 1
 
             self.keys_message_label = ctk.CTkLabel(
@@ -387,11 +407,7 @@ class KeysSectionMixin:
                 self._set_keys_message(f"Check failed: {error}")
                 return
 
-            if status == "OK":
-                activate_api_key(session, name)
-            else:
-                deactivate_api_key(session, name)
-            touch_api_key_last_used(session, name)
+            record_check_result(session, name, status, detail)
         finally:
             session.close()
 
@@ -400,6 +416,32 @@ class KeysSectionMixin:
             message += f"\n{detail}"
         self._set_keys_message(message)
         self._refresh_keys_list()
+
+    def _copy_key_from_gui(self) -> None:
+        """
+        Скопировать расшифрованный секрет в буфер обмена — чтобы завести
+        тот же ключ в другом инструменте/проекте, не читая руками
+        encrypted_keys.json. Секрет НИКОГДА не выводится в саму форму —
+        только в буфер, только по явному запросу с правом view_full_key.
+        """
+        if self.keys_copy_name_entry is None:
+            return
+
+        name = self.keys_copy_name_entry.get().strip()
+        if not name:
+            self._set_keys_message("Enter a key name to copy.")
+            return
+
+        secret = self.key_storage.get_token(name)
+        if secret is None:
+            self._set_keys_message(f"Secret not found in storage for: {name}")
+            return
+
+        self.clipboard_clear()
+        self.clipboard_append(secret)
+        self.update()
+
+        self._set_keys_message(f"Copied full secret to clipboard: {name}")
 
     def _run_key_check(self, marketplace: str, key_kind: str, secret: str) -> tuple[str, str | None]:
         """
@@ -451,11 +493,23 @@ class KeysSectionMixin:
 
         lines = []
         for index, key in enumerate(keys, start=1):
-            status = "active" if key.is_active else "not checked / inactive"
+            # Кеш последнего Check (record_check_result) — не "проверяем
+            # прямо сейчас", а последнее, что мы знаем. checked_at всегда
+            # берём из last_used_at, т.к. это единственное поле, куда
+            # Check пишет время (см. key_repository.record_check_result).
+            status = key.last_check_status or ("active" if key.is_active else "not checked")
+            checked_at = (
+                key.last_used_at.strftime("%Y-%m-%d %H:%M:%S")
+                if key.last_used_at
+                else "never"
+            )
             lines.append(
                 f"{index}. {key.name} | {key.marketplace} / {key.key_kind} | "
-                f"{key.masked_token} | {status}"
+                f"{key.masked_token} | last check: {status} ({checked_at})"
             )
+            if key.last_check_detail:
+                for detail_line in key.last_check_detail.splitlines():
+                    lines.append(f"     {detail_line}")
 
         output = "\n".join(lines) if lines else "No keys saved yet."
 

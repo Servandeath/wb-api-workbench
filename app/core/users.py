@@ -64,3 +64,8 @@ def change_user_role(user: UserAccount, new_role: UserRole) -> UserAccount:
 def deactivate_user(user: UserAccount) -> UserAccount:
     user.is_active = False
     return user
+
+
+def activate_user(user: UserAccount) -> UserAccount:
+    user.is_active = True
+    return user

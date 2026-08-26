@@ -3,6 +3,7 @@ import pytest
 from app.core.settings import UserRole
 from app.core.users import (
     UserAccount,
+    activate_user,
     add_user,
     find_user,
     change_user_role,
@@ -99,6 +100,15 @@ def test_deactivate_user():
     updated_user = deactivate_user(user)
 
     assert updated_user.is_active is False
+
+
+def test_activate_user():
+    user = create_user("manager1", UserRole.OPERATOR)
+    deactivate_user(user)
+
+    updated_user = activate_user(user)
+
+    assert updated_user.is_active is True
 
 
 def test_find_user_returns_user():

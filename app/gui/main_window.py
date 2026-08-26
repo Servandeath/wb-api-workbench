@@ -68,6 +68,7 @@ class MainWindow(
         self.keys_name_entry: ctk.CTkEntry | None = None
         self.keys_message_label: ctk.CTkLabel | None = None
         self.keys_check_name_entry: ctk.CTkEntry | None = None
+        self.keys_copy_name_entry: ctk.CTkEntry | None = None
         self.keys_output: ctk.CTkTextbox | None = None
 
         self.api_tester_section_option: ctk.CTkOptionMenu | None = None

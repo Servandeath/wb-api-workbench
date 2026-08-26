@@ -43,3 +43,11 @@ def test_admin_has_both_save_permissions():
     # режимах (Test и Real), не только в Real.
     assert has_permission(UserRole.ADMIN, "save_test_response") is True
     assert has_permission(UserRole.ADMIN, "save_response") is True
+
+
+def test_only_admin_can_view_full_key():
+    # "Copy full secret" в Keys — только Admin, ни Operator, ни Tester.
+    assert has_permission(UserRole.ADMIN, "view_full_key") is True
+    assert has_permission(UserRole.OPERATOR, "view_full_key") is False
+    assert has_permission(UserRole.TESTER, "view_full_key") is False
+    assert has_permission(UserRole.VIEWER, "view_full_key") is False
